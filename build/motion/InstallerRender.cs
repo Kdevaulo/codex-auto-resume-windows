@@ -162,8 +162,14 @@ namespace CodexAutoResume
                     SettingsForm.StandIn(scale, 1.0);
                     SettingsForm.FontFactor = (float)(scale / SettingsForm.SystemScale);
                     SettingsForm.RenderPinned = true;
+                    // v0.6.26 (audit-apng M2): in the face an English Windows has, Segoe UI (Typeface.Segoe), whatever
+                    // Windows this machine is - the window sets each language in its own Windows' face from it
+                    // (Typeface.ForLanguage), as the product does. Before, the English picture made on a Korean Windows
+                    // kept Malgun Gothic, which draws every backslash of its log as a won sign.
                     Font box = SystemFonts.MessageBoxFont;
-                    font = new Font(box.FontFamily, box.SizeInPoints * SettingsForm.FontFactor, box.Style, GraphicsUnit.Point);
+                    font = new Font(Typeface.Segoe, box.SizeInPoints * SettingsForm.FontFactor, box.Style, GraphicsUnit.Point);
+                    if (!string.Equals(font.FontFamily.Name, Typeface.Segoe, StringComparison.OrdinalIgnoreCase))
+                        font = new Font(box.FontFamily, box.SizeInPoints * SettingsForm.FontFactor, box.Style, GraphicsUnit.Point);
                 }
                 else
                 {

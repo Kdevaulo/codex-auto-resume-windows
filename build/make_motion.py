@@ -107,19 +107,22 @@ def schedule(plan: dict, also=()) -> tuple:
 
 
 def run(plan: dict, draw, also=()):
-    """(delay in ms, scene, picture) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
+    """(delay in ms, scene, picture, whole) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
     frame whose picture is the one before's only lengthens it, so a picture is written once however long it holds.
-    The first is always frame 1, even when the next is the same."""
+    The first is always frame 1, even when the next is the same. `whole` is whether the frame is a cut of the plan's
+    state (motion_plan.is_cut), which the assembler writes as one rectangle (v0.6.26 audit M1)."""
     frames, held, _end = schedule(plan, also)
-    previous = None
+    previous, before = None, None
     for frame, delay in zip(frames, held):
         picture = draw(frame)
+        whole = motion_plan.is_cut(before, frame)
+        before = frame
         if previous is not None and picture == previous[2]:
             previous[0] += delay
             continue
         if previous is not None:
             yield tuple(previous)
-        previous = [delay, frame.scene, picture]
+        previous = [delay, frame.scene, picture, whole]
     if previous is not None:
         yield tuple(previous)
 
@@ -311,6 +314,17 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
         else:
             picture = bytearray(plain)
         window = dict(frame.window)
+        # Where the pointer stands, worked out before anything is laid: the popup's buttons take a hover face under it.
+        x = y = None
+        if plan.get("pointer") is not None:
+            # A pointer that has come to rest stays where it came to rest, whatever moves under it.
+            if frame.pointer[0] == "at" and frame.pointer in standing:
+                x, y = standing[frame.pointer]
+            else:
+                x, y = motion_compose.pointer_at(frame, seen_bounds, origin, card)
+                standing.clear()
+                if frame.pointer[0] == "at":
+                    standing[frame.pointer] = (x, y)
         if strip:
             motion_compose.draw_strip(picture, width, height, strip["top"], strip["height"],
                                       tuple(brand.rgb(strip["colour"])))
@@ -333,7 +347,8 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
                 motion_compose.lay_rgba(picture, width, height, layer, layer_wide, left, top, level)
         if popup is not None and frame.popup:
             level, below, _arrived = popup.opening(frame)
-            motion_compose.lay_rgba(picture, width, height, popup.drawn(frame, popup_clear), popup.size[0],
+            at = None if x is None else (x - popup_at[0], y - popup_at[1] - below)
+            motion_compose.lay_rgba(picture, width, height, popup.drawn(frame, popup_clear, pointer=at), popup.size[0],
                                     popup_at[0], popup_at[1] + below, level)
         state = dict(frame.card) if frame.card else None
         if state is not None and card is not None:
@@ -341,14 +356,6 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
                                                            pressed=state["pressed"], leave=state["leave"]))
         if plan.get("pointer") is None:
             return bytes(picture)                     # nobody points: the card appearing on its own
-        # A pointer that has come to rest stays where it came to rest, whatever moves under it.
-        if frame.pointer[0] == "at" and frame.pointer in standing:
-            x, y = standing[frame.pointer]
-        else:
-            x, y = motion_compose.pointer_at(frame, seen_bounds, origin, card)
-            standing.clear()
-            if frame.pointer[0] == "at":
-                standing[frame.pointer] = (x, y)
         pressed = window.get("pressed") is not None or bool(state and state["pressed"])
         motion_compose.draw_pointer(picture, width, height, x, y, scale=scale, pressed=pressed,
                                     ripple=motion_plan.ripple_at(frame), accent=accent)

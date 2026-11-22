@@ -9,7 +9,8 @@ elsewhere (which closes it) and leaves. The end is the start: no popup and no ca
 What the product does, and where it is read (build/motion_popup.py and build/motion_tip.py have the whole of it):
 - the hover card comes when the shell says the pointer rests on the icon (NIN_POPUPOPEN: Windows' hover time, 400 ms by
   default - a hold in the plan, since the product has no constant for it), fades in over brand's transition on brand's curve
-  with no rise (ui/tray/tipcard.py _appear, _fade_step), and a click hides it at once as the popup comes (clicks.py _select);
+  with no rise (ui/tray/tipcard.py _appear, _fade_step), and the icon's button going down hides it at once (v0.6.26,
+  audit-apng M8: ui/tray/icon.py _hide_tip at WM_LBUTTONDOWN, before NIN_SELECT opens the popup);
 - the popup fades in and rises SPACING xs into place over brand's transition (ui/popup/messages.py _start_opening), and is
   placed by ui/popup/placement.place: centred on the icon, SPACING m above the work area, inside it.
 
@@ -88,7 +89,9 @@ class StoryTests(unittest.TestCase):
                     self.assertLessEqual(frame.t, at["release"], "and not after the press is let go (%d ms)" % frame.t)
                 self.assertEqual(at["card"], at["rest"] + HOVER_MS,
                                  "it comes after Windows' hover time on the icon, and not at once")
-                self.assertTrue(any(frame.t >= at["press"] for frame in shown), "the press is made with the card on screen")
+                # v0.6.26 (audit-apng M8): the icon's button going down takes it away, before the popup opens.
+                self.assertEqual(at["last_card"] < at["press"], True, "the card goes as the press goes down")
+                self.assertEqual(max(frame.t for frame in shown if frame.t < at["press"]), at["last_card"])
                 after = [frame for frame in frames if frame.t > at["last_card"]]
                 self.assertFalse(any(frame.tip for frame in after), "and once it is gone it does not come back")
 
@@ -105,10 +108,11 @@ class StoryTests(unittest.TestCase):
                 self.assertEqual(fade, [born + index * GLIDE_FRAME_MS for index in range(len(fade))],
                                  "a frame every 16 ms of the fade, the card's own frame timer")
                 self.assertGreaterEqual(len(fade) * GLIDE_FRAME_MS, brand.MOTION["transition_ms"] - GLIDE_FRAME_MS)
-                self.assertLessEqual(at["popup"] - at["last_card"], GLIDE_FRAME_MS, "the popup is the very next thing")
+                self.assertFalse(any(frame.tip for frame in frames if at["press"] <= frame.t),
+                                 "gone from the press's first frame, before the popup opens")
                 for frame in frames:
                     if frame.tip:
-                        self.assertEqual(dict(frame.tip)["until"], at["popup"], "each says when the click took it away")
+                        self.assertEqual(dict(frame.tip)["until"], at["press"], "each says when the press took it away")
 
     def test_the_popup_opens_with_the_products_fade_and_rise_in_frames_of_16_ms(self):
         from codex_auto_resume import brand
@@ -158,7 +162,8 @@ class StoryTests(unittest.TestCase):
                 self.assertLess(away[0], icon_left, "left of the icon: nothing of ours")
                 self.assertGreater(clicks[-1][1], at["ask"], "after the story, and it is that click that closes the popup")
                 shut = next(frame for frame in frames if frame.t > at["ask"] and not frame.popup)
-                self.assertGreater(shut.t, clicks[-1][1], "the popup goes when it is clicked elsewhere (WM_ACTIVATE), at once")
+                # v0.6.26 (audit-apng M8): as the press goes down elsewhere, which takes the activation (WA_INACTIVE).
+                self.assertEqual(shut.t, clicks[-1][1], "the popup goes when it is pressed elsewhere, at once")
 
 
 class StepTests(unittest.TestCase):
@@ -342,7 +347,7 @@ class DrawnTests(unittest.TestCase):
         for key in ("start", "waiting", "closed", "last"):
             self.assertEqual(self.alpha(key, *centre), 0, "no card in %s" % key)
         self.assertEqual(self.alpha("card", *centre), 255, "the card is there, opaque, once it has faded in")
-        self.assertEqual(self.alpha("press", *centre), 255, "and while it is pressed")
+        self.assertEqual(self.alpha("press", *centre), 0, "and gone while the icon is pressed (v0.6.26)")
         self.assertTrue(0 < self.alpha("fading", *centre) < 255, "it is part way while it fades in")
 
     def test_the_hover_card_stands_beside_the_icon_on_the_taskbar_s_side_as_the_product_places_it(self):

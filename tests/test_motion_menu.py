@@ -56,7 +56,8 @@ class StepTests(unittest.TestCase):
         self.assertEqual(state(first)["selected"], {"pending": 0}, "the row under the pointer is chosen")
         self.assertNotIn("menu", state(first), "the menu opens as the button is let go, not as it is pressed")
         opened = [frame for frame in self.frames if "menu" in state(frame)]
-        self.assertEqual(state(opened[0])["menu"], {"at": "task.0"})
+        # v0.6.26 (audit-apng M4): it fades in from its first frame.
+        self.assertEqual(state(opened[0])["menu"], {"at": "task.0", "appear_ms": 0})
         self.assertEqual(opened[0].t, first.t + 3 * 16)
         self.assertEqual(opened[0].pointer, ("at", "task.0"))
 
@@ -130,7 +131,7 @@ class SourceTests(unittest.TestCase):
         self.assertIn("FillRowMenu(", render, "filled as the menu's Opening fills it")
         self.assertIn("SoftMenuLayer layer = pendingMenu.Layer;", render)
         self.assertIn("layer.Render();", render)
-        self.assertIn('RenderMenu(picture, Str(menu, "at"), Str(frame, "hover"), writer);',
+        self.assertIn('RenderMenu(picture, menu, Str(frame, "hover"), writer);',
                       guiscan.member_body("SettingsForm", "RenderPicture"))
         self.assertIn('RenderSelected(Map(frame, "selected"))', guiscan.member_body("SettingsForm", "RenderState"))
 
