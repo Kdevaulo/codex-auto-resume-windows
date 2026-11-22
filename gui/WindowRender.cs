@@ -500,7 +500,12 @@ namespace CodexAutoResume
             renderBusy = on;
             renderBusyAt = -1;
             SetBusy(on);
-            if (on) BusyHold.Lapse();       // a picture of a call in flight is of one that has lasted, not of its first 150 ms
+            if (on && Transition.RenderMs >= 0 && BusyHold.On)
+            {
+                renderBusyAt = Transition.RenderMs;
+                StopHoldTimer();
+            }
+            else if (on) BusyHold.Lapse();       // a picture of a call in flight is of one that has lasted, not of its first 150 ms
             // Every button's look has just begun to glide: on the picture's clock (v0.6.26, audit-apng M6) drawn at each
             // frame's moment from here, nothing counted as moving; on the wall clock a picture is of where it ends.
             var waited = Stopwatch.StartNew();

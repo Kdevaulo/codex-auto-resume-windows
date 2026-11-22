@@ -133,8 +133,18 @@ class RenderClockTests(unittest.TestCase):
         self.half_way(5, 4, 6, "pending.retry")
         self.assertEqual(self.pictures[4][1], self.pictures[3][1], "at its first moment it has not moved yet")
 
-    def test_the_busy_look_glides(self):
-        self.half_way(9, 8, 12, "overview.toggle")
+    def test_the_busy_look_holds_for_busy_hold_then_glides(self):
+        """v0.6.26 (review P2): as the product, the buttons keep their look for BusyHold's 150 ms after the click
+        (SetBusy, BusyHold.Begin, LooksEnabled), then glide to the busy look from that moment."""
+        box = self.pictures[12][2]["overview.toggle"]
+        self.assertEqual(self.level(9, box), self.level(8, box), "80 ms in: held")
+        self.assertEqual(self.level(10, box), self.level(8, box), "140 ms in: still held")
+        self.half_way(11, 8, 12, "overview.toggle")
+
+    def test_a_call_that_ends_inside_the_hold_shows_nothing(self):
+        box = self.pictures[23][2]["pending.retry"]
+        for index in (24, 25, 26, 27):
+            self.assertEqual(self.level(index, box), self.level(23, box), "frame %d" % index)
 
     def test_a_paused_window_opened_again_glides_out_of_the_call_in_flight(self):
         self.half_way(14, 13, 15, "overview.toggle")
