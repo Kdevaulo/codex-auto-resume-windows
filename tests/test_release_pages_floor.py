@@ -25,8 +25,8 @@ _HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from test_version_picker import (BOOTSTRAP, GOOD_FINAL, LIFT, PAGES, POWERSHELL, RELEASE,  # noqa: E402
-                                 entry, junk, kept, listed)
+from test_version_picker import (BOOTSTRAP, GOOD_FINAL, INSTALLED, LIFT, LISTED, PAGES, POWERSHELL,  # noqa: E402
+                                 RELEASE, ROWS, PickerRun, entry, junk, kept, listed)
 
 
 def full(*versions):
@@ -108,6 +108,20 @@ class FloorTests(unittest.TestCase):
 
     def test_the_floor_is_the_pickers_own(self):
         self.assertEqual(self.answer["constants"]["PickFloor"], "0.6.2")
+
+
+@unittest.skipUnless(POWERSHELL.is_file(), "the bootstrap is PowerShell on Windows")
+class FloorRunTests(PickerRun):
+    """-Versions, the whole script, on the day the 150th release is published."""
+
+    def test_five_full_pages_whose_last_reaches_below_the_floor_are_listed(self):
+        self.installation(INSTALLED)
+        self.serve(*([junk(30)] * 4 + [junk(30 - len(LISTED)) + LISTED]))
+        code, output, asked = self.run_it(Versions=True)
+        self.assertEqual(code, 0, output[-2000:])
+        self.assertEqual(self.answer_lines(output, "version: "), ROWS)
+        self.assertEqual([request[1] for request in asked if request[0] == "Get"],
+                         [PAGES.replace("{page}", str(page)) for page in range(1, 6)])
 
 
 if __name__ == "__main__":
