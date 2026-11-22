@@ -439,16 +439,19 @@ namespace CodexAutoResume
         {
             if (Shift <= 0.01f)
             {
-                Words(e);
+                Words(e, false);
                 return;
             }
-            // Drawn as ever into a picture of itself, laid that much lower: the words move by less than a pixel.
+            // Drawn as ever into a picture of itself, laid that much lower: the words move by less than a pixel. Onto its own
+            // ground (opaque): GDI draws words over nothing it knows in a picture without ClearType - grey, and heavier than
+            // the same words at rest beside it on the screen (measured at 100 %, Microsoft Sans Serif and Segoe UI: a stem's
+            // column 15 where at rest it was 242-339 in ClearType's colours), so the words changed look for the whole nudge.
             using (var picture = new Bitmap(Math.Max(1, Width), Math.Max(1, Height)))
             {
                 using (Graphics g = Graphics.FromImage(picture))
                 {
                     g.Clear(BackColor);
-                    Words(new PaintEventArgs(g, ClientRectangle));
+                    Words(new PaintEventArgs(g, ClientRectangle), true);
                 }
                 e.Graphics.Clear(BackColor);
                 GraphicsState state = e.Graphics.Save();
@@ -460,26 +463,38 @@ namespace CodexAutoResume
             }
         }
 
-        private void Words(PaintEventArgs e)
+        /// Its words; `opaque`, each on its own ground (BackColor), as into the picture a shifted label is drawn from.
+        private void Words(PaintEventArgs e, bool opaque)
         {
+            // Label's disabled ink (TextRenderer.DisabledTextColor), as WrapLabel draws it.
+            Color disabled = Palette.Contrast ? SystemColors.GrayText
+                           : BackColor.GetBrightness() < SystemColors.Control.GetBrightness() ? ControlPaint.Dark(BackColor)
+                           : SystemColors.ControlDark;
+            Color ink = Enabled ? ForeColor : disabled;
             if (!Split)
             {
-                base.OnPaint(e);
+                if (!opaque)
+                {
+                    base.OnPaint(e);
+                    return;
+                }
+                // As Label draws it (WrapLabel.Format, in its padding), on its ground.
+                var face = new Rectangle(Padding.Left, Padding.Top, Math.Max(0, ClientSize.Width - Padding.Horizontal),
+                                         Math.Max(0, ClientSize.Height - Padding.Vertical));
+                TextRenderer.DrawText(e.Graphics, Lines(face.Width), Font, face, ink, BackColor, Format);
                 return;
             }
             Rectangle versionBox, editionBox;
             bool below;
             Placed(out versionBox, out editionBox, out below);
-            // Label's disabled ink (TextRenderer.DisabledTextColor) for both, as WrapLabel draws it.
-            Color disabled = Palette.Contrast ? SystemColors.GrayText
-                           : BackColor.GetBrightness() < SystemColors.Control.GetBrightness() ? ControlPaint.Dark(BackColor)
-                           : SystemColors.ControlDark;
-            Color ink = Enabled ? ForeColor : disabled;
             Color quiet = Enabled ? EditionColor : disabled;
-            TextRenderer.DrawText(e.Graphics, version, Font, versionBox, ink, LineFormat);
+            if (opaque) TextRenderer.DrawText(e.Graphics, version, Font, versionBox, ink, BackColor, LineFormat);
+            else TextRenderer.DrawText(e.Graphics, version, Font, versionBox, ink, LineFormat);
             TextFormatFlags format = Mirror.Words(Mirror.Of(this), EditionFormat(below));
             string word = below ? Soft.Wrap(edition, AsideFont, Math.Max(1, editionBox.Width), format) : edition;
-            TextRenderer.DrawText(e.Graphics, word, AsideFont, editionBox, quiet, format);
+            // The edition after the version, whose ground it is drawn on starts after the version's last letter.
+            if (opaque) TextRenderer.DrawText(e.Graphics, word, AsideFont, editionBox, quiet, BackColor, format);
+            else TextRenderer.DrawText(e.Graphics, word, AsideFont, editionBox, quiet, format);
             EditionDrawn = quiet;
         }
 

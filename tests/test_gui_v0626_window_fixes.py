@@ -197,7 +197,10 @@ $holder.Size = New-Object Drawing.Size 120, 40
 $holder.BackColor = (T 'Palette').GetField('Canvas', $static).GetValue($null)
 $text = [Activator]::CreateInstance((T 'VersionLabel'), $true)
 $null = $text.GetType().GetMethod('Set', $instance).Invoke($text, [object[]]@('v0.6.26', $null))
-$pill = [Activator]::CreateInstance((T 'VersionPill'), $instance, $null, [object[]]@($text), $null)
+# In Segoe UI, the window's face on an English Windows (the CI's), drawn in ClearType: a machine whose default face is a
+# bitmap font (Gulim) has no smoothing to lose, and passed while every runner failed.
+$text.Font = New-Object Drawing.Font 'Segoe UI', 9
+$pill =[Activator]::CreateInstance((T 'VersionPill'), $instance, $null, [object[]]@($text), $null)
 $pill.Padding = (T 'VersionPill').GetProperty('Inner', $static).GetValue($null, $null)
 $pill.SetBounds(10, 8, 80, 24)
 $holder.Controls.Add($pill)
