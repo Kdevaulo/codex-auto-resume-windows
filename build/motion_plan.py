@@ -321,6 +321,8 @@ class _Run:
         self.tip = None
         self.frames = []
         self.scene = ""
+        # The control a press left its hover on (`_after_press`), or None.
+        self.kept = None
 
     def emit(self, at=None):
         at = self.t if at is None else at
@@ -363,6 +365,34 @@ def _clear_faces(run):
         run.window.pop(kind, None)
         if run.card is not None:
             run.card[kind] = None
+    run.kept = None
+
+
+# v0.6.26 (review P3): the window's controls whose hover a click leaves where it is - the pointer still rests on them, so no
+# MouseLeave comes (SoftButton.Hover, NavButton) - as named targets (motion_compose.locate puts the pointer on them); and
+# among them those that stay where they are when the page changes: the tabs, Settings' sections and the setup window's one
+# primary button (InstallerWindow's `forward`, on every page).
+KEPT_AFTER_PRESS = re.compile(r"(page\.|section\.|setting\.|save\Z|restore\Z|pending\.(retry|timeline)\Z"
+                              r"|overview\.toggle\Z|button\.forward\Z)")
+KEPT_OVER_PAGES = re.compile(r"(page\.|section\.|button\.forward\Z)")
+
+
+def _after_press(run, target):
+    """The faces once a press on `target` is let go: the press gone; the hover where the pointer still rests - on a control of
+    the window that keeps it (KEPT_AFTER_PRESS) - until the pointer moves, the page changes under it (not for a control that
+    stays, KEPT_OVER_PAGES), or the window is opened again; everything else as before, cleared."""
+    keep = isinstance(target, str) and KEPT_AFTER_PRESS.match(target) is not None
+    _clear_faces(run)
+    if keep:
+        run.window["hover"] = target
+        run.kept = target
+
+
+def _leave_kept(run):
+    """The pointer has left the control it pressed (it moves on): the hover kept after the press goes."""
+    if run.kept is not None and run.window.get("hover") == run.kept:
+        run.window.pop("hover", None)
+    run.kept = None
 
 
 def _walk(plan: dict) -> _Run:
@@ -401,6 +431,10 @@ def _step(run, step):
             run.window.pop("scroll", None)
         if "page" in state and state["page"] != run.window.get("page") and "explain" not in state:
             run.window.pop("explain", None)
+        # v0.6.26 (review P3): a hover a press kept goes with the page it stood on, and with a window opened again.
+        if run.kept is not None and (("page" in state and state["page"] != run.window.get("page")
+                                      and not KEPT_OVER_PAGES.match(run.kept)) or "locale" in state):
+            _leave_kept(run)
         for key, value in state.items():
             if value is None:
                 run.window.pop(key, None)
@@ -423,6 +457,7 @@ def _step(run, step):
         run.t += int(step["hold"])
         return
     if "move" in step:
+        _leave_kept(run)
         count, gap = run.frames_of(step, 10)
         start = run.resting()[1]
         target = step["move"]
@@ -456,7 +491,7 @@ def _step(run, step):
             run.emit(run.t + index * gap)
         run.t += count * gap
         if kind == "pressed":
-            _clear_faces(run)
+            _after_press(run, target)
         return
     if "card" in step:
         count, gap = run.frames_of(step, 9)
