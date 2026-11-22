@@ -9,6 +9,12 @@ G4. After a long action the hourglass stayed over a resting pointer until it mov
 (GivePointerBack). Now every wait of the window ends so - SetBusy, the version listing's dialog and the editor - through
 one call (ChromeHost.PointerBack).
 
+G2 (the owner, 2026-11-22, "대화상자 유지"). The window minimised under one of its dialogs - Show desktop, or another
+program - hid the dialog (WM_SHOWWINDOW, SW_PARENTCLOSING), and WinForms ended its modal loop with no close asked: the
+dialog and what was typed in it were gone. Now a modal dialog stays, as the setup window does, and is there with what
+was typed when the window comes back. Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
+and brings it back.
+
 The window is compiled from the shipped sources; its dialogs are made and asked, never shown. GUI test module: run on its
 own, through gui_lock.sh.
 """
@@ -96,6 +102,75 @@ if ($back) {
 [IO.File]::WriteAllText((Join-Path $env:CAR_WORK 'result.json'), ($out | ConvertTo-Json -Depth 6 -Compress), $utf8)
 """
 
+KEPT = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+# A failing probe fails its test: never a dialog on the desktop waiting for someone (every handler exits with 3).
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::ThrowException)
+function Stop-Probe([object]$Problem) { [Console]::Error.WriteLine('probe failed: ' + $Problem); [Environment]::Exit(3) }
+Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public static class CarKeptUser {
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+    [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+}
+'@
+$assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
+$script:static = [Reflection.BindingFlags]'Static,NonPublic,Public'
+function T([string]$name) { return $assembly.GetType('CodexAutoResume.' + $name, $true) }
+$null = (T 'Palette').GetMethod('Adopt', $script:static, $null, [Type[]]@([string]), $null).Invoke($null, [object[]]@('light'))
+(T 'SettingsForm').GetField('dpiScale', $script:static).SetValue($null, [double]1.0)
+$script:owner = New-Object System.Windows.Forms.Form
+$script:owner.StartPosition = 'Manual'; $script:owner.Location = New-Object System.Drawing.Point(-4000, -4000)
+$script:owner.ShowInTaskbar = $false
+$script:dialog = [Activator]::CreateInstance((T 'SoftDialog'), $true)
+$script:dialog.Text = 'Message for this conversation'
+$script:dialog.BackColor = (T 'Palette').GetField('Canvas', $script:static).GetValue($null)
+$null = (T 'Soft').GetMethod('DialogBar', $script:static).Invoke($null, [object[]]@($script:dialog))
+$script:dialog.FormBorderStyle = 'FixedDialog'; $script:dialog.MinimizeBox = $false; $script:dialog.MaximizeBox = $false
+$script:dialog.ShowInTaskbar = $false
+$script:dialog.StartPosition = 'Manual'; $script:dialog.Location = New-Object System.Drawing.Point(-4000, -3000)
+$script:dialog.ClientSize = New-Object System.Drawing.Size 500, 200
+$script:box = New-Object System.Windows.Forms.TextBox
+$script:box.Dock = 'Top'
+$script:dialog.Controls.Add($script:box)
+$script:r = @{ closed_by_probe = $false }
+$script:owner.add_Shown({
+  try {
+    $script:steps = New-Object System.Windows.Forms.Timer; $script:steps.Interval = 800
+    $script:step = 0
+    $script:steps.add_Tick({
+      try {
+        $script:step++
+        if ($script:step -eq 1) {
+            $script:box.Text = 'words typed before Show desktop'
+            # The window minimised under its dialog, as Show desktop does.
+            [void][CarKeptUser]::ShowWindow($script:owner.Handle, 6)
+        } elseif ($script:step -eq 2) {
+            $script:r.owner_iconic = [CarKeptUser]::IsIconic($script:owner.Handle)
+            $script:r.dialog_visible = [CarKeptUser]::IsWindowVisible($script:dialog.Handle)
+            [void][CarKeptUser]::ShowWindow($script:owner.Handle, 9)
+        } else {
+            $script:steps.Stop()
+            $script:r.typed = $script:box.Text
+            $script:r.closed_by_probe = $true
+            $script:dialog.DialogResult = 'OK'
+        }
+      } catch { Stop-Probe $_ }
+    })
+    $script:steps.Start()
+    $script:r.result = [string]$script:dialog.ShowDialog($script:owner)
+    $script:steps.Stop()
+    $script:r.steps = $script:step
+    $script:owner.BeginInvoke([Action]{ $script:owner.Close() }) | Out-Null
+  } catch { Stop-Probe $_ }
+})
+[System.Windows.Forms.Application]::Run($script:owner)
+[IO.File]::WriteAllText((Join-Path $env:CAR_WORK 'result.json'), ($script:r | ConvertTo-Json -Compress), (New-Object Text.UTF8Encoding $false))
+"""
+
 
 class SourceTests(unittest.TestCase):
     def test_windows_sees_the_press_on_a_held_window_before_the_wait_cursor(self):
@@ -124,6 +199,9 @@ class WindowTests(unittest.TestCase):
         work = Path(cls.folder.name)
         exe = compile_window(work)
         cls.answer = run_probe(PROBE, work, 300, CAR_EXE=str(exe))
+        kept = work / "kept"
+        kept.mkdir()
+        cls.kept = run_probe(KEPT, kept, 120, CAR_EXE=str(exe))
 
     @classmethod
     def tearDownClass(cls):
@@ -139,6 +217,13 @@ class WindowTests(unittest.TestCase):
     def test_a_wait_that_ended_gives_the_cursor_back_at_once(self):
         self.assertTrue(self.answer["pointer_back"], "ChromeHost.PointerBack")
         self.assertEqual(self.answer["pointer_after"], "Default")
+
+    def test_a_dialog_stays_with_what_was_typed_when_its_window_is_minimised_under_it(self):
+        seen = self.kept
+        self.assertTrue(seen.get("owner_iconic"), "the stand-in window was minimised: %r" % seen)
+        self.assertTrue(seen.get("dialog_visible"), "the dialog stayed on the screen: %r" % seen)
+        self.assertTrue(seen["closed_by_probe"], "the dialog's loop ended only when the probe closed it: %r" % seen)
+        self.assertEqual((seen["result"], seen["typed"]), ("OK", "words typed before Show desktop"))
 
 
 if __name__ == "__main__":

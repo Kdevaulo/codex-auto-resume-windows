@@ -2240,6 +2240,16 @@ namespace CodexAutoResume
             // Centred on the window that opened it as it is first shown (OnOwner): the caption leaves this message alone.
             if (m.Msg == WM_WINDOWPOSCHANGING && !placed) OnOwner(m.LParam);
             if (chrome == null && m.Msg == Chrome.WM_NCCALCSIZE && CalcSizeEarly(ref m)) return;
+            // v0.6.26 (audit G2; the owner, 2026-11-22, "대화상자 유지"): the window it belongs to minimised under it - by a
+            // person's Show desktop, or by another program - hides the windows it owns (SW_PARENTCLOSING), and WinForms ends
+            // a modal dialog's loop once it is hidden, with no close asked: the dialog and what was typed in it were gone.
+            // It stays where it is instead, as the setup window does (InstallerWindow), and is there with what was typed
+            // when the window comes back.
+            if (m.Msg == WM_SHOWWINDOW && m.WParam == IntPtr.Zero && m.LParam.ToInt64() == SW_PARENTCLOSING && Modal)
+            {
+                m.Result = IntPtr.Zero;
+                return;
+            }
             base.WndProc(ref m);
             // Shown: the owner dimmed under it (a top-level dialog only - never one the layout audit or a still lays out as a
             // child); hidden or gone: the veil with it.
@@ -2505,7 +2515,7 @@ namespace CodexAutoResume
             OpenFade();
         }
 
-        private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002;
+        private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002, SW_PARENTCLOSING = 1;
 
         // ------------------------------------------------------------------ centred on the window that opened it
 
