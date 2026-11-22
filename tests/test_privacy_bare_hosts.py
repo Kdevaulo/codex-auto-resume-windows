@@ -3,8 +3,10 @@
 docs/STANDARDS.md C3 says the shipped files name no unexpected host, and test_privacy_claims checks only hosts written
 as URLs (`https://...`). Two comments named one bare - the lunar table's source (brand/days.py) and the squircle's
 article (brand/shape.py) - and a third a documentation address (mcp/tools.py), which nothing connects to, but which the
-sentence's letter forbids. Now a host written as a name is looked for as well, in what ships, and only the hosts the
-product has a reason to name stand: GitHub's, python.org's, ChatGPT's (pinned, handed to Codex), the Windows `chcp.com`,
+sentence's letter forbids. Now a host written as a name is looked for as well, in what ships - the window's sources
+and the skills too (the review's W2: the advanced page's example named example.com where the card shows the address masked,
+domain and all) - and only the hosts the product has a reason to name stand: GitHub's, python.org's, ChatGPT's
+(pinned, handed to Codex), the Windows `chcp.com`,
 and, in the advanced edition's package, the courier's two. Its own module; the lookup knows a name by its ending
 (com, org, net, kr, gov, hk, edu, io, ai), so `args.dev` and `self.app` are not read as hosts.
 """
@@ -30,7 +32,8 @@ ADVANCED = "advanced/src/"
 
 def bare_hosts():
     found = []
-    for path in (tracked("scripts/*") + tracked("build/install/*") + tracked("src/*") + tracked("advanced/src/*")):
+    for path in (tracked("scripts/*") + tracked("build/install/*") + tracked("src/*") + tracked("advanced/src/*")
+                 + tracked("gui/*") + tracked("advanced/gui/*") + tracked("skills/*") + tracked("advanced/skills/*")):
         try:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
