@@ -260,10 +260,16 @@ $CompatibilityCheckTimeoutMin = 5
 # deadline for the whole request, body and all (Invoke-BoundedWebRequest). -Version, which the
 # window waits far longer for, gives the same request $ReleasesVersionTimeout.
 $ReleasesHosts = @('api.github.com')
-# 8 MiB (the owner, 2026-11-10; it was 2 MiB, and a page of 30 releases had reached 60 % of that, release notes and all).
+# 32 MiB (the owner, 2026-11-23, v0.6.26; it was 2 MiB, then 8 MiB from v0.6.23): above the largest page GitHub can
+# send, so a growing list or long notes can no longer reach it. That page is thirty releases, each with a body at
+# GitHub's limit of 125,000 characters, every one of them a control character JSON writes as six (\u0001), a name
+# of 1,024 such characters, sixteen files (twice what a release of this product carries) with names and labels of
+# 255, and every author, uploader and URL field: about 24.6 million characters, 23.5 MiB
+# (tests/test_release_pages_large.py builds it), which Windows PowerShell 5.1's ConvertFrom-Json reads in about a
+# second. 32 MiB is over a third more than that.
 # An installed copy keeps the bound of the bootstrap.ps1 it was installed with until it is updated: for those the only
 # relief is keeping the release notes short.
-$ReleasesMaxChars = 8388608
+$ReleasesMaxChars = 33554432
 $ReleasesTimeoutMax = 15
 $ReleasesTimeoutMin = 5
 $ReleasesVersionTimeout = 60
@@ -343,7 +349,7 @@ $AdvancedMarkSince = '0.6.17'
 # $PickPageTimeoutMax. The window waits longer than that for the answer. Twenty pages are 600
 # published releases (v0.6.26; it was five, 150, and the 150th would have come around March 2027),
 # so about 590 above the floor list in full - some years at the pace since v0.5.0. Thirty to a page
-# is the page STANDARDS.md C3 names; a page of thirty is about a tenth of $ReleasesMaxChars.
+# is the page STANDARDS.md C3 names; a page of thirty of today's notes is about a fortieth of $ReleasesMaxChars.
 $PickPageSize = 30
 $PickMaxPages = 20
 $PickBudgetSeconds = 400
