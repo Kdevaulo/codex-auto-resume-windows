@@ -1211,8 +1211,13 @@ function Invoke-Setup {
     $global:LASTEXITCODE = 1
     # -X disable-remote-debug, before anything else, wherever this script runs the bundled interpreter: remote debugging
     # off (PEP 768, Python 3.14; src/codex_auto_resume/startup.py, NO_REMOTE_DEBUG).
+    # The log this relays into is English, whatever the stored or Windows language is (v0.6.26): setup's summary block too.
+    $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'
     try { & $Python -X disable-remote-debug $setup @Arguments | ForEach-Object { Write-Host ('    ' + $_) } }
-    finally { if ($counted) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null } }
+    finally {
+        $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null
+        if ($counted) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null }
+    }
     return $LASTEXITCODE
 }
 
