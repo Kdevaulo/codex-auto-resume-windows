@@ -271,6 +271,7 @@ class AutoSwitch:
         settled = swap.recover(self.paths, store, home, read_real=self.read_real, restart=self._restart_now)
         if settled == swap.SWITCHED:
             self._switched(now)
+            self._settled(settled, intent)               # A2: journalled "switched", as `settle` says it while off
         elif settled is not None:
             self._settled(settled, intent)
             if settled in NOT_FINISHED and isinstance(intent, dict):
