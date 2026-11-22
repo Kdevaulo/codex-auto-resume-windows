@@ -76,6 +76,10 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         # v0.6.26: whether this tick's detection could read Codex's history - None where it did not try (recovery off,
         # a home retiring) - which the watcher's own judge reads (engine/impossible.py, history_unreadable).
         self.detection_failed = None
+        # v0.6.26 (review V6): what each record the plug handed over this tick waits for, by conversation - the gate's
+        # reason, as core told it (engine/plugrecords.py `_record_waits`) - which the watcher's judge reads beside core's
+        # own waiting records. Empty in the standard edition, whose plug hands over none.
+        self.handed_waits = {}
         # The watch and outcome observation continue when recovery is paused: taking
         # back a queued continuation is exactly what a Pause asks for.
         try:

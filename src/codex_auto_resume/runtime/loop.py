@@ -554,6 +554,12 @@ class WatchLoop:
         and the Restart Manager asked who holds the newest queue and state databases, the writer locks of the records
         waiting elsewhere or unknown (five at most) and, where nobody holds a newest one, the older ones."""
         waiting = [row for row in store.records_in(machine.WAITING, home_key="")]
+        # Review V6: and every record the running edition's plug handed over that waits now, as core told the plug its
+        # gate's reason this tick (Engine.handed_waits) - the standard edition's plug hands over none.
+        handed = getattr(engine, "handed_waits", None)
+        if isinstance(handed, dict):
+            waiting += [{"thread_id": thread, "last_error": reason} for thread, reason in sorted(handed.items())
+                        if isinstance(thread, str) and isinstance(reason, str)]
         reasons = {row.get("last_error") for row in waiting}
         facts = {"usage_protocol": bool(reasons & impossible.USAGE_BROKEN_REASONS)}
         wanted = impossible.ELSEWHERE_REASONS | impossible.LOCKS_UNREAD_REASONS
