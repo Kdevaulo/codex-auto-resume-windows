@@ -42,7 +42,7 @@
     "",
     "`release_pages` is the same list on the same host and path, a page of thirty at a time,",
     "and `{page}` is the one thing put into it. Only the Dashboard's Install another version...",
-    "reads it (`-Versions`, and `-Pick` again before it installs), at most five pages, when a",
+    "reads it (`-Versions`, and `-Pick` again before it installs), at most twenty pages, when a",
     "person presses that button and when they confirm a version. It takes from each release",
     "its tag, whether it is a draft or a pre-release, and the names of its files - nothing",
     "else - and the version picked is still fetched by `download` and `archive` and checked",
@@ -104,7 +104,7 @@
     "0.6.24": "0c97d9b11f14c67af0e52c84673c0ed3904ef8c89c6fb27b49d8906b68dff5d8",
     "0.6.25": "83fd72da9e0b4e804e979268dfa424101022ea671baf660b80b216b2cffc98ff"
   },
-  "prerelease": [],
+  "prerelease": ["0.6.26-beta"],
   "advanced": {
     "archive": "CodexAutoResume-Advanced-v{version}-win-x64.zip",
     "sha256": {

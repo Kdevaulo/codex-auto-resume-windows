@@ -364,6 +364,8 @@ class OptionKey(StrEnum):
     # last such occasion ended with nothing started. Written by the watcher, read by the Dashboard's process.
     ANCHOR_RETRY_UNTIL = "anchor_retry_until"
     ANCHOR_STOPPED_AT = "anchor_stopped_at"
+    # v0.6.26 (audit A3): the next look of an occasion it holds open, for wake_for_reset to wake the PC for.
+    ANCHOR_NEXT_LOOK = "anchor_next_look"
     # v0.6.20 (the pair audit, V20-2): when account_switch last saw another account signed in, and the change of account
     # window_anchor last took in - its window stamps are the account's that was signed in, and go with it.
     ACCOUNT_CHANGED_AT = "account_changed_at"

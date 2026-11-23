@@ -97,9 +97,9 @@
       -Versions is what the Dashboard's Install another version... asks when a person presses it,
       and at no other time. It reads the same list of this repository's releases through the one
       other address api.github.com is allowed for (`release_pages` in scripts/release.json): the
-      same host and path, one page of thirty at a time, at most five pages, whose page number is
+      same host and path, one page of thirty at a time, at most twenty pages, whose page number is
       the one thing put into it. Each page is checked as the update check's page is (Read-ReleasesPage),
-      and a page that cannot be read, or a fifth as full as the rest, lists nothing at all:
+      and a page that cannot be read, or a twentieth as full as the rest, lists nothing at all:
       `versions: unavailable`, exit 12. It downloads nothing, installs nothing and does not refresh
       the compatibility data.
 
@@ -260,10 +260,16 @@ $CompatibilityCheckTimeoutMin = 5
 # deadline for the whole request, body and all (Invoke-BoundedWebRequest). -Version, which the
 # window waits far longer for, gives the same request $ReleasesVersionTimeout.
 $ReleasesHosts = @('api.github.com')
-# 8 MiB (the owner, 2026-11-10; it was 2 MiB, and a page of 30 releases had reached 60 % of that, release notes and all).
+# 32 MiB (the owner, 2026-11-23, v0.6.26; it was 2 MiB, then 8 MiB from v0.6.23): above the largest page GitHub can
+# send, so a growing list or long notes can no longer reach it. That page is thirty releases, each with a body at
+# GitHub's limit of 125,000 characters, every one of them a control character JSON writes as six (\u0001), a name
+# of 1,024 such characters, sixteen files (twice what a release of this product carries) with names and labels of
+# 255, and every author, uploader and URL field: about 24.6 million characters, 23.5 MiB
+# (tests/test_release_pages_large.py builds it), which Windows PowerShell 5.1's ConvertFrom-Json reads in about a
+# second. 32 MiB is over a third more than that.
 # An installed copy keeps the bound of the bootstrap.ps1 it was installed with until it is updated: for those the only
 # relief is keeping the release notes short.
-$ReleasesMaxChars = 8388608
+$ReleasesMaxChars = 33554432
 $ReleasesTimeoutMax = 15
 $ReleasesTimeoutMin = 5
 $ReleasesVersionTimeout = 60
@@ -337,13 +343,17 @@ $AdvancedStateSince = @(@('0.6.20-beta.3', 9), @('0.6.19-beta', 8), @('0.6.16-be
 $AdvancedReadableFrom = 7
 $AdvancedMarkSince = '0.6.17'
 # The list is read page by page, $PickPageSize to a page (release_pages in release.json), at most
-# $PickMaxPages of them - a page with fewer ends it, and a full last one is no answer - and all of it
-# within $PickBudgetSeconds, each page within $PickPageTimeoutMax. The window waits longer than that
-# for the answer.
+# $PickMaxPages of them - a page with fewer ends it, and so does a full one whose last release is older
+# than $PickFloor, since the list is newest first and nothing past it is ever offered; a full last one
+# that ends neither way is no answer - and all of it within $PickBudgetSeconds, each page within
+# $PickPageTimeoutMax. The window waits longer than that for the answer. Twenty pages are 600
+# published releases (v0.6.26; it was five, 150, and the 150th would have come around March 2027),
+# so about 590 above the floor list in full - some years at the pace since v0.5.0. Thirty to a page
+# is the page STANDARDS.md C3 names; a page of thirty of today's notes is about a fortieth of $ReleasesMaxChars.
 $PickPageSize = 30
-$PickMaxPages = 5
-$PickBudgetSeconds = 150
-$PickPageTimeoutMax = 30
+$PickMaxPages = 20
+$PickBudgetSeconds = 400
+$PickPageTimeoutMax = 20
 # I12 as the owner amended it on 2026-10-03: its two pre-release clauses bind the update check's offer,
 # and a version picked by name and confirmed - a pre-release too, older or newer - follows "older only
 # with -Force", the confirmation being the yes. Both $false is I12 as it was written before: a
@@ -1166,9 +1176,11 @@ function Get-ReleasePages {
         Page 1, 2, ... of the constant `release_pages` in scripts/release.json, whose `{page}` is the
         one thing put into it, each read by Read-ReleasesPage within what is left of
         $PickBudgetSeconds, at most $PickPageTimeoutMax. A page with fewer than $PickPageSize entries
-        is the last; no more than $PickMaxPages are asked for, newest first, which is many times what
-        is published above $PickFloor - and a last one asked for that is as full as the rest is a
-        throw too, since more may follow it, and the oldest would be left out unsaid. An entry
+        is the last, and so is a full one whose last entry that counts is older than $PickFloor: the
+        list is newest first, so the pages after it hold only versions the picker never offers (an
+        old release named earlier on a page, out of its place, ends nothing). No more than
+        $PickMaxPages are asked for - and a last one asked for that is as full as the rest and ends
+        neither way is a throw, since more may follow it, and the oldest would be left out unsaid. An entry
         counts only when it is published (`draft` false), tagged `v` and a version
         Get-ChosenVersion accepts, marked a pre-release exactly when its version is one, and has a
         list of assets; of the assets only their names are kept, and only names that are text. A version the list names twice is taken where it is named first.
@@ -1186,6 +1198,7 @@ function Get-ReleasePages {
     $seen = @{}
     $ended = $false
     for ($page = 1; $page -le $PickMaxPages; $page++) {
+        $last = $null
         $left = $PickBudgetSeconds - $clock.Elapsed.TotalSeconds
         $seconds = [int][Math]::Floor([Math]::Min([double]$PickPageTimeoutMax, $left))
         if ($seconds -lt $ReleasesTimeoutMin) { throw 'Too little time was left to read the rest of the list of releases.' }
@@ -1203,6 +1216,7 @@ function Get-ReleasePages {
             try { $number = Get-ChosenVersion $tag.Substring(1) } catch { continue }
             if ($entry.prerelease -ne $number.Contains('-')) { continue }
             if ($null -eq $entry.assets -or $entry.assets -isnot [array]) { continue }
+            $last = $number
             $names = @()
             foreach ($asset in $entry.assets) {
                 if ($asset -isnot [Management.Automation.PSCustomObject]) { continue }
@@ -1214,6 +1228,7 @@ function Get-ReleasePages {
             $found += ,([pscustomobject]@{ Version = $number; Prerelease = $entry.prerelease; Assets = $names })
         }
         if ($list.Count -lt $PickPageSize) { $ended = $true; break }
+        if ($null -ne $last -and (Compare-ProductVersion -Left $last -Right $PickFloor) -lt 0) { $ended = $true; break }
     }
     if (-not $ended) {
         throw ('The list of releases goes on past the ' + $PickMaxPages + ' pages read, so none of it is shown.')

@@ -251,6 +251,46 @@ namespace CodexAutoResume
             return value is double ? (int)(double)value : 0;
         }
 
+        /// v0.6.26: what the watcher's own judge says of Codex (domain/public.py self_check), for the Diagnostics callout:
+        /// why recovery cannot work here, in the words of its rule - or "" while it says nothing.
+        private string CodexNote(Dictionary<string, object> watcher)
+        {
+            var lines = new List<string>();
+            string word = Blocked(watcher);
+            string rule = word == null ? null : word.Substring(word.IndexOf(':') + 1);
+            if (rule == "held_elsewhere")
+                lines.Add(S("selfcheck.held_elsewhere", "Codex changed how it runs, so this product cannot tell whether a conversation is open. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "locks_unread")
+                lines.Add(S("selfcheck.locks_unread", "Codex no longer shows which conversations are open in the way this product reads. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "stale_database")
+                lines.Add(S("selfcheck.stale_database", "Codex keeps its conversations in a database this product does not read, so recovery cannot work here. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "usage_protocol")
+                lines.Add(S("selfcheck.usage_protocol", "For half an hour Codex has answered usage reads in a way this version does not know, so recoveries wait. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "history_unreadable")
+                lines.Add(S("selfcheck.history_unreadable", "Codex's history can no longer be read, so new interruptions are not being detected. Export Diagnostics and report it."));
+            else if (rule == "engine_missing")
+                lines.Add(S("selfcheck.engine_missing", "The Codex engine could not be found or checked, so nothing can be recovered."));
+            // #10: the newest error code Codex reported in the last day that this version does not know, and how many.
+            var check = Map(watcher, "self_check");
+            string code = Str(Map(check, "unknown_error"), "code");
+            if (code != null)
+                lines.Add(S("selfcheck.unknown_error", "Codex reported an error this version does not know: {code} ({n} in the last day). It is not recovered.",
+                            "code", code)
+                          .Replace("{n}", Mirror.Embed(((int)Number(Map(check, "unknown_error"), "count"))
+                                                       .ToString(CultureInfo.CurrentCulture))));
+            // #6: Codex runs in a layout this version has not been tested on, found when its version changed.
+            string version = Str(check, "layout_untested");
+            if (version != null)
+                lines.Add(S("selfcheck.layout_untested", "Codex {version} runs in a layout this version has not been tested on.",
+                            "version", version));
+            // #11: since this product's own update, no look has matched the app's server, where the version before did.
+            string updated = Str(check, "updated_from");
+            if (updated != null)
+                lines.Add(S("selfcheck.unpaired_after_update", "Since this product was updated from {version}, it has not matched the Codex app's server, which that version did.",
+                            "version", updated));
+            return string.Join(Environment.NewLine, lines.ToArray());
+        }
+
         private static string Str(Dictionary<string, object> map, string key)
         {
             return Get(map, key) as string;
@@ -627,6 +667,7 @@ namespace CodexAutoResume
                         if (updatesManaged) diagUpdate.Text = S("diag.update_managed", "turned off by your administrator");
                         diagStartup.Text = Equals(Get(status, "startup_enabled"), true) ? S("diag.yes", "yes") : S("diag.no", "no");
                         diagUpgrade.Text = upgrade ? S("diag.upgrade_pending", "An older watcher still owns the state; finish by restarting the watcher") : "";
+                        diagCodexNote.Text = CodexNote(watcher);
                     }
                 }
                 UpdateToggle();
@@ -1302,6 +1343,15 @@ namespace CodexAutoResume
             if (toggleButton.Text != text) toggleButton.Text = text;
         }
 
+        /// The window's wait cursor on or off as `waited` says; off, the cursor given back at once wherever the pointer rests
+        /// (ChromeHost.PointerBack): Windows asks for one only as the pointer moves (v0.6.24 final, live re-check 4, M3;
+        /// v0.6.26, audit G4: every wait of the window ends so, not only the editor's).
+        internal void GivePointerBack(bool waited)
+        {
+            UseWaitCursor = waited;
+            if (!waited) ChromeHost.PointerBack();
+        }
+
         // ---------------------------------------------------------------- actions
         private void SetBusy(bool on)
         {
@@ -1313,7 +1363,8 @@ namespace CodexAutoResume
             // v0.6.23: most calls are answered in 17 to 87 ms, and every button in the window flashed flat and back for each
             // one, the wait cursor with them. The buttons are refused at once, as ever; they and the cursor look it only when
             // the call is still running at BusyHold's end. Reduce motion: at once, as everything is there.
-            if (busy == 0) UseWaitCursor = false;
+            // v0.6.26 (audit G4): ended, the pointer given back where it rests, never the hourglass until it moves.
+            if (busy == 0) { if (UseWaitCursor) GivePointerBack(false); }
             else if (!BusyHold.Begin(delegate { UseWaitCursor = busy > 0; })) UseWaitCursor = true;
             UpdatePendingButtons();
             UpdateHistoryButtons();

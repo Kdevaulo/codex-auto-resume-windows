@@ -79,8 +79,15 @@ SETUP_STEPS = 7
 WATCHER_WAIT = control.WATCHER_START_TIMEOUT
 
 
+def words(key: str) -> str:
+    """One of the plugin's sentences: in English where the caller's log is English (ENV_ENGLISH, set by the installer around
+    every call it relays), otherwise in the language this process speaks. Not a preference set once: each `_cli` call
+    builds an App that adopts the stored language again (v0.6.26, the setup window's log)."""
+    return l10n.text("msg." + key, "en") if os.environ.get(ENV_ENGLISH) == "1" else l10n.message(key)
+
+
 def say(key: str) -> None:
-    print(l10n.message(key))
+    print(words(key))
 
 
 def bullet() -> str:
@@ -405,7 +412,7 @@ def cmd_setup(args) -> int:
     print()
     say("ready_defaults")
     for key in ("ready_b1", "ready_b2", "ready_b3", "ready_b4"):
-        print("  " + bullet() + " " + l10n.message(key))
+        print("  " + bullet() + " " + words(key))
     print()
     started = looked_again(home, started)
     confirmed = started in ("running", "already-running")

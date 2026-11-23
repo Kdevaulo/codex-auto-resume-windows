@@ -98,8 +98,13 @@ class Paths:
         self.failure_seen_file = self.state_dir / "failure-seen.json"
         # v0.6.11: the status file for other tools, written only while the setting is on (statusfile.py).
         self.status_file = self.state_dir / "status.json"
+        # v0.6.26: whether recovery cannot work here, as the watcher's judge of its own looks says it (engine/impossible.py).
+        self.self_check_file = self.state_dir / "selfcheck.json"
         # v0.6.16-beta.3: the ids each conversation Codex split has had, ids only, written by the watcher (codex/chains.py).
         self.split_chains_file = self.state_dir / "split-chains.json"
+        # v0.6.26 (update resilience #6, #11): the Codex app's process layout counted by role, and the last one that paired,
+        # written by the watcher when it changes (codex/layout.py) - counts and versions only, never a path.
+        self.codex_layout_file = self.state_dir / "codex-layout.json"
         # v0.6.12: the power action after usage-limit recoveries, armed in the Dashboard (control/poweraction.py).
         self.power_action_file = self.state_dir / "power-action.json"
         # v0.6.16-beta.3: the words for this time a person added for one waiting recovery (oncewords.py).
@@ -231,11 +236,12 @@ class Paths:
             return []
         names = ["state.sqlite", "state.sqlite-journal", "state.sqlite-wal", "state.sqlite-shm", "settings.json",
                  "compatibility.json", "compat-cache.json", "failure-seen.json", "status.json",
-                 "power-action.json", "split-chains.json", "once-words.json", "edition-left.txt"]
+                 "power-action.json", "split-chains.json", "once-words.json", "edition-left.txt", "codex-layout.json",
+                 "selfcheck.json"]
         files = [self.state_dir / name for name in names]
         for pattern in ("settings.*.tmp", "compatibility.*.tmp", "compat-cache.*.tmp", "failure-seen.*.tmp",
                         "status.*.tmp", "power-action.*.tmp", "split-chains.*.tmp", "once-words.*.tmp",
-                        "edition-left.*.tmp", "settings.unreadable-*.json"):
+                        "edition-left.*.tmp", "codex-layout.*.tmp", "selfcheck.*.tmp", "settings.unreadable-*.json"):
             files += [p for p in sorted(self.state_dir.glob(pattern))
                       if not is_link(p) and self.confined(p)]
         return files + self.owned_advanced_files() + [self.state_dir / OWNER_MARKER]

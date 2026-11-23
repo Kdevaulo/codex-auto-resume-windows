@@ -41,6 +41,10 @@ class ReasonCode(StrEnum):
     # moved its internals again, "the app is not running" would be untrue. A report carries the word by its name
     # (ownreport/evidence.py). An older version reads it as "other", and rewrites it the next time it looks.
     APP_SERVER_UNMATCHED = "app_server_unmatched"
+    # v0.6.26 (update resilience, proposal 9): and the engine set in Settings, never second-guessed, is not the one the
+    # Codex app runs - so nothing is matched until they agree. Asks for a person as app_server_unmatched does; written
+    # as the backend names it (codex/transport.py UNMATCHED_NAMED_ENGINE), a kind of app_server_unmatched after a colon.
+    APP_SERVER_UNMATCHED_NAMED_ENGINE = "app_server_unmatched:named_engine"
     NOTLOADED = "notLoaded"
     LOADED_STATE_UNKNOWN = "loaded_state_unknown"
     # v0.6.16-beta.4: open in another Codex session - a terminal or VS Code - which the app's queue cannot reach.
@@ -51,6 +55,11 @@ class ReasonCode(StrEnum):
     LOADED_RECHECK_FAILED = "loaded_recheck_failed"
     USAGE_UNAVAILABLE = "usage_unavailable"
     USAGE_UNKNOWN = "usage_unknown"
+    # v0.6.26 (update resilience, proposal 7): and which way a usage read broke, where Codex's helper said: it answered
+    # in a way this version does not know, refused the request, or did not answer at all (engine/impossible.py).
+    USAGE_PROBE_BROKEN_ANSWER = "usage_probe_broken_answer"
+    USAGE_PROBE_BROKEN_REQUEST = "usage_probe_broken_request"
+    USAGE_PROBE_BROKEN_START = "usage_probe_broken_start"
     USAGE_RECHECK_FAILED = "usage_recheck_failed"
     # v0.6.11: Windows reports no internet connection, so usage is not read (power.py; off by default).
     OFFLINE = "offline"

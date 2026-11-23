@@ -606,7 +606,17 @@ for ($i = 0; $i -lt 360; $i++) {
     $null = $animate.Invoke($mark, @())
     if ($i -eq 10 -or $i -eq 170 -or $i -eq 330) { $leak += ,@($i, [Icons]::Resources()) }
 }
-$out.leak = @{ at = $leak; baseline = $baseline; before = $before; distinct = 0 }
+# What the mark itself holds: the process's objects less what is left once the mark has destroyed everything it made
+# (Dispose), with nothing pumped or painted since the loop, so the process's other objects - the walks', the held
+# reasons', the hidden window's, Windows' own lazily made ones - are the same in both counts (v0.6.26 audit Z4: "+6"
+# over a baseline taken before all of those counted them too, GDI/USER 10/7 on 2026-11-16). Then a mark of its own
+# again for the rest, as a window that is still open would have.
+$markType.GetMethod('Dispose', $instance).Invoke($mark, @())
+$freed = [Icons]::Resources()
+$mark = $markType.GetConstructors($instance)[0].Invoke([object[]]@($window.PSObject.BaseObject))
+$markType.GetField('Clock', $instance).SetValue($mark, [ProbeClock]::Func())
+$null = $follow.Invoke($mark, [object[]]@('recovering'))
+$out.leak = @{ at = $leak; baseline = $baseline; before = $before; freed = $freed; distinct = 0 }
 
 # A shutdown or restart that another program calls off, and a Restart Manager query that ends nothing: Windows asks
 # (WM_QUERYENDSESSION, which WinForms raises FormClosing for) and then says the session goes on (WM_ENDSESSION, FALSE).
@@ -1077,8 +1087,10 @@ class TaskbarMarkTests(unittest.TestCase):
             with self.subTest(objects=name):
                 self.assertLessEqual(abs(late[index] - early[index]), 1)
                 self.assertLessEqual(abs(middle[index] - early[index]), 1)
-                # The frame on show and the second small handle, and nothing else.
-                self.assertLessEqual(early[index] - leak["baseline"][index], 6)
+                # The frame on show and the second small handle, and nothing else: what the mark held at frame 10
+                # over what is left once it has destroyed everything it made (audit Z4: not the whole process's
+                # growth since the window was made).
+                self.assertLessEqual(early[index] - leak["freed"][index], 6)
 
     def test_a_shutdown_called_off_leaves_the_button_following_the_window(self):
         """WinForms raises FormClosing for WM_QUERYENDSESSION too. A shutdown another program calls off, or a Restart

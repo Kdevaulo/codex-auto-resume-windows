@@ -368,7 +368,7 @@ namespace CodexAutoResume
                 Ex("account_switch",
                    Scene(Says(f => f.ExampleField("account_switch", "instead"))),
                    // Its button waits for the MALR measurement: the card says so, and the example says what the card says.
-                   Scene(Says(f => f.Word("page.account.signed_in", "Signed in: {account}", "account", "e•••@example.com")),
+                   Scene(Says(f => f.Word("page.account.signed_in", "Signed in: {account}", "account", "e•••@e•••.com")),
                          Says(f => f.Word("page.refused.switch_unmeasured",
                                           "It has not been measured on this Codex that a sign-in made from here, followed by a restart of Codex, brings Codex up with the new account. Switch in Codex instead.")))),
                 Ex("steer_send",

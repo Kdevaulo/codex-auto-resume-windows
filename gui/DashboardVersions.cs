@@ -22,9 +22,9 @@ namespace CodexAutoResume
 {
     internal sealed partial class SettingsForm
     {
-        // The listing reads up to five pages of the list, each with a deadline of its own, inside the bootstrap's
-        // budget of 150 seconds; this waits a little longer than that, and never kills it.
-        private const int ListMilliseconds = 180000;
+        // The listing reads up to twenty pages of the list, each with a deadline of its own, inside the bootstrap's
+        // budget of 400 seconds; this waits a little longer than that, and never kills it.
+        private const int ListMilliseconds = 430000;
         // scripts/bootstrap.ps1's $ExitPickRefused: -Pick refused, said why on its line, and changed nothing.
         private const int PickRefusedCode = 15;
 
@@ -199,7 +199,12 @@ namespace CodexAutoResume
         {
             if (versionsList == null || versionsList.IsDisposed) return;
             Form dialog = versionsList.FindForm();
-            if (dialog != null) dialog.UseWaitCursor = false;
+            // Its wait ended: the pointer given back where it rests (v0.6.26, audit G4).
+            if (dialog != null && dialog.UseWaitCursor)
+            {
+                dialog.UseWaitCursor = false;
+                ChromeHost.PointerBack();
+            }
             bool shown = state == "listed" && rows != null && listed != null;
             versionsRows = shown ? rows : new List<string[]>();
             versionsListed = shown ? listed : null;

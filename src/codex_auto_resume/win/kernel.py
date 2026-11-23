@@ -202,22 +202,63 @@ def running_images():
     return found
 
 
-def processes_named(names) -> list:
+def processes_named(names, families=()) -> list:
     """Every process whose program file is called one of `names` (compared without case, as Windows compares file
-    names), each {"pid", "parent", "path"}: one Toolhelp snapshot for the ids, the parents and the file names, then
-    each such process alone opened for limited query and asked its image (QueryFullProcessImageNameW). The path is
-    None where the process cannot be opened - another account's, a protected one, or gone - as WMI leaves its
-    ExecutablePath empty. Raises AdapterError where no snapshot can be made.
+    names), each {"pid", "parent", "path", "created", "family"}: one Toolhelp snapshot for the ids, the parents and
+    the file names, then each such process alone opened for limited query and asked its image
+    (QueryFullProcessImageNameW), its creation time (GetProcessTimes, a FILETIME) and its package family name
+    (GetPackageFamilyName). The path, the time and the family are None where the process cannot be opened - another
+    account's, a protected one, or gone - as WMI leaves its ExecutablePath empty; the family is None too for a process
+    of no package. Raises AdapterError where no snapshot can be made.
 
     v0.6.24 final: the process inventory codex/pairing.py reads. It was Get-CimInstance Win32_Process in Windows
-    PowerShell, about 10 s a call on the owner's PC; this is a few milliseconds, and starts no process."""
+    PowerShell, about 10 s a call on the owner's PC; this is a few milliseconds, and starts no process.
+
+    v0.6.26 (update resilience #2, #5): every process whose package family is one of `families` is listed too, whatever
+    its file is called - each process of the snapshot is then opened for limited query alone and asked its family, as
+    `decide_host` asks it (a few tens of milliseconds for a few hundred processes); one whose image cannot be read is
+    left out. The creation time lets a reader tell a parent whose id Windows gave to a later process from the parent
+    that started the child (a parent created after its child is not its parent), the rule `decide_host` holds to."""
     wanted = {str(name).casefold() for name in names}
+    kinds = {str(family).casefold() for family in families}
     k = _kernel()
     entries = _toolhelp(k)
     if not entries:
         raise AdapterError("process_inventory_unavailable")
-    return [{"pid": pid, "parent": parent, "path": _image(k, pid)}
-            for pid, parent, exe in entries if pid and exe.casefold() in wanted]
+    found = []
+    for pid, parent, exe in entries:
+        if not pid or (exe.casefold() not in wanted and not kinds):
+            continue
+        path, created, family = _facts(k, pid)
+        if exe.casefold() in wanted or (path is not None and family is not None and family.casefold() in kinds):
+            found.append({"pid": pid, "parent": parent, "path": path, "created": created, "family": family})
+    return found
+
+
+def _facts(k, pid) -> tuple:
+    """(image path, creation FILETIME, package family name) of process `pid`, from one handle opened for limited
+    query: each None where it cannot be opened or Windows will not say (the family also for a process of no package)."""
+    handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return None, None, None
+    try:
+        buffer, count = C.create_unicode_buffer(32768), W.DWORD(32768)
+        path = (buffer.value or None) if k.QueryFullProcessImageNameW(handle, 0, buffer, C.byref(count)) else None
+        times = [W.FILETIME() for _ in range(4)]
+        created = ((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+                   if k.GetProcessTimes(handle, *(C.byref(t) for t in times)) else 0) or None
+        family = None
+        try:
+            name, length = C.create_unicode_buffer(256), W.UINT(256)
+            k.GetPackageFamilyName.argtypes = [W.HANDLE, C.POINTER(W.UINT), W.LPWSTR]
+            k.GetPackageFamilyName.restype = C.c_long
+            if k.GetPackageFamilyName(handle, C.byref(length), name) == 0 and name.value:
+                family = name.value
+        except AttributeError:
+            pass                                    # a Windows with no packages at all
+        return path, created, family
+    finally:
+        k.CloseHandle(handle)
 
 
 def _image(k, pid):

@@ -195,7 +195,7 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   redirect followed and nothing about the machine in it. It is the one body the update check
   parses, and it is read for one thing: the newest published pre-release - not a draft, tagged
   `vMAJOR.MINOR.PATCH-alpha` or `-beta` with a stage's number - that is newer than both the version
-  installed and the newest release. A list that cannot be read, is over 8 MiB, is not a list or
+  installed and the newest release. A list that cannot be read, is over 32 MiB, is not a list or
   has not arrived within the time the check has left - a deadline for the whole request, not only
   for its first byte - offers nothing and changes nothing else in the answer. What it finds is only
   offered, and only where there is no release to offer first, in a question whose default button is
@@ -210,9 +210,10 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   *Install another version...* on the same page is the bootstrap too (`-Versions`, then `-Pick`),
   started by the window only when a person presses the button and again when they confirm a row;
   building its dialog starts nothing, so the window audit never asks GitHub. It reads the whole list
-  of releases from a second api.github.com address on the same path - thirty to a page, at most five
-  pages, the page number the one thing put in, each page under the same size, redirect and host
-  checks and a deadline inside one budget - and any page that fails lists nothing, as does a fifth
+  of releases from a second api.github.com address on the same path - thirty to a page, at most twenty
+  pages, ending at the first page that is short or that reaches below v0.6.2, the page number the one
+  thing put in, each page under the same size, redirect and host checks and a deadline of 20 seconds
+  inside one budget of 400 seconds - and any page that fails lists nothing, as does a twentieth
   page as full as the rest, which more may follow. A picked version
   never reaches a URL as typed: it is rebuilt from its integers by the version rule, the row must
   still be offered exactly as it was shown when the list is read again, and `-Force` is required for
@@ -227,7 +228,7 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   answers on one closed line that must agree with its exit code. A conversion that fails starts the
   installed watcher again and installs nothing. Only then does the archive's installer run, with the
   edition change passed to it only on a change and only to installers that know editions. While it
-  runs, the window greys every action button, the header's Start watcher included, so the window
+  runs, the window greys every action button, Start watcher included, so the window
   cannot start the current watcher between the conversion and the installer. Nor does reading the
   state put it back meanwhile: while an installation holds its lock, the window, the panel, Codex's
   tools and the command line - a notification's Cancel, a status from Codex's skill, an installer's
@@ -255,9 +256,10 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   which is described under *Compatibility data can only restrict* below. An advanced installation asks one more constant URL on the same host the same way, for the advanced edition's measurement data.
 - **No shell, and no values in script text.** No Python code uses `shell=True`, `os.system`, `eval`
   or `exec`, and every Python subprocess gets an argument list. Windows PowerShell runs the
-  installer, the uninstaller and the plugin's setup script; the Python runtime uses it to list
-  ChatGPT and Codex processes (a fixed script) and raise notifications, and at setup to create the
-  Start Menu shortcut. The last two receive their values - toast text, shortcut paths - as
+  installer, the uninstaller and the plugin's setup script; the Python runtime uses it to raise
+  notifications, and at setup to create the Start Menu shortcut (the list of running ChatGPT and Codex
+  processes is not its: since v0.6.24 it is one Toolhelp snapshot in the program's own process, of which
+  only the ChatGPT.exe and codex.exe rows are kept). Both receive their values - toast text, shortcut paths - as
   environment variables read by a constant script (`src/codex_auto_resume/pwsh.py`). PowerShell
   does not parse an environment variable's value as code, so no character in a conversation title
   or a folder name can change what runs. The Python runtime starts PowerShell by its full path under

@@ -50,7 +50,7 @@ footnote. There are four kinds, and they are genuinely different:
   nothing else in the answer.
 
   *Install another version...*, on the same page, reads that list as well, all of it, because it
-  shows every version you may pick: up to five HTTPS `GET` requests, without signing in, to
+  shows every version you may pick: up to twenty HTTPS `GET` requests, without signing in, to
   `api.github.com/repos/songyb111-gachon/codex-auto-resume-windows/releases?per_page=30&page={page}`,
   where only the page number changes, with no redirect followed. It reads them when you press the
   button and once more when you confirm a version, and at no other time; a page that cannot be read
@@ -117,7 +117,7 @@ The sections below take each in turn.
 
 Nothing, beyond the aggregate download count GitHub shows for every release (see
 [Installing it](#installing-it)) and, if you press *Check for updates* or *Refresh
-compatibility data*, up to three more anonymous requests to public GitHub addresses and, for *Install another version...*, up to five reads of the list of releases each time it is read (when you open it and again when you confirm), then the download you confirmed. There is no
+compatibility data*, up to three more anonymous requests to public GitHub addresses and, for *Install another version...*, up to twenty reads of the list of releases each time it is read (when you open it and again when you confirm), then the download you confirmed. There is no
 telemetry, no analytics, no crash reporting, no opt-in reporting, no automatic update check and
 no automatic compatibility refresh — no endpoint of any kind exists to
 receive them, because no collection service is operated for this project. Local statistics
@@ -292,11 +292,11 @@ resuming is safe. Codex's databases are opened read-only (SQLite `mode=ro` with
   item was recorded (`thread_items.created_at_ms`) - never what any item says.
 
 It also asks Windows content-free questions, chiefly two: which ChatGPT and Codex processes are
-running (process id, parent and executable path), to find the desktop app and the Codex engine
+running (process id, parent and executable path - from one Toolhelp snapshot that lists the id, parent and file name of every process before it keeps only the ChatGPT.exe and codex.exe rows, each opened for limited query to read its path), to find the desktop app and the Codex engine
 it runs its Codex server from; and, through the
 Restart Manager, which process has the conversation's lock file open, to tell whether the
 conversation is open in the app. The rest are content-free too: the path and start time of a
-process it found, to confirm it is still the same one; where the app runs more than one
+process it found, to confirm it is still the same one; the program path of every process this account can open, asked only before it deletes a folder an update set aside, to see whether a program still runs from it, and kept nowhere but as a count in the log; where the app runs more than one
 process of the configured Codex engine, which of them has Codex's queue or state database open, asked
 of the Restart Manager too, to tell which is the app's own Codex server; the per-user
 registry values it registered itself; whether High Contrast is on and, from v0.6.4, whether
@@ -431,10 +431,11 @@ already there:
   that completes the handshake; it refuses every request the server sends back;
 - short `codex --version` and `codex queue --help` probes, to confirm it is driving the
   interface it expects;
-- Windows PowerShell, by its full path under `System32` and with fixed scripts, to list the
-  running ChatGPT and Codex processes and to raise a notification. The Restart Manager is
-  called directly, not through PowerShell. Setting up the Start Menu shortcut runs a fixed
-  PowerShell script too.
+- Windows PowerShell, by its full path under `System32` and with fixed scripts, to raise a
+  notification. The Restart Manager is called directly, not through PowerShell, and so is the
+  list of running ChatGPT and Codex processes: from v0.6.24 it is one snapshot taken by Windows'
+  Toolhelp calls inside the program's own process, which starts no process. Setting up the Start
+  Menu shortcut runs a fixed PowerShell script too.
 
 Values such as a notification's label or a shortcut's path reach those scripts as
 environment variables rather than as script text, so PowerShell does not parse them as code.
@@ -593,6 +594,11 @@ default (or wherever `CODEX_AUTO_RESUME_PLUGIN_HOME`, or failing that
   `LC_ALL`, `LC_MESSAGES` and `LANG`, and your Windows display languages. Nothing in it is about
   your conversations, and it holds no Custom message text. The window uses it only while that key
   still matches and writes a new one otherwise; deleting it only makes the next opening a little
+  slower. `Uninstall.cmd` with `-Purge` removes it with the rest of `config/`;
+- `config/window-start.jit`, from v0.6.24 - the Dashboard's start profile: the list of the window's own
+  methods that .NET's multicore JIT wrote down as the window started, so that the next start can compile
+  them ahead on other cores. Method names only: nothing of yours, no conversation, path or text. A
+  profile that cannot be read is no profile, and deleting it only makes the next opening a little
   slower. `Uninstall.cmd` with `-Purge` removes it with the rest of `config/`;
 - `config/compat-cache.json`, from v0.6.5 — the Codex compatibility data you last asked for, kept
   only if it passed validation. Its one writer is this installation's validator (`controlcli

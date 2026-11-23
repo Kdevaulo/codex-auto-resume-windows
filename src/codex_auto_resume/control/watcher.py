@@ -6,12 +6,14 @@ cannot prove whether it sent.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import time
 
 from .. import chosen_runtime, config, edition, homes, machine, managed, settings, startup, windows
 from ..domain.plug import DEFER, EXTRA, Surface
+from ..domain.public import self_check
 from ..domain.vocabulary import WatcherEnd
 from ..store import TERMINAL, LegacyStore, Store, StoreError
 from ..win import ownprocess
@@ -180,6 +182,18 @@ def _version() -> str:
     return config.version()
 
 
+def read_self_check(paths, status):
+    """The running watcher's self-check (Paths.self_check_file, domain/public.self_check), or None: a file of another
+    watcher, or one that cannot be read, says nothing (v0.6.26)."""
+    try:
+        path = paths.self_check_file
+        if not path.is_file() or path.is_symlink() or path.stat().st_size > 4096:
+            return None
+        return self_check(json.loads(path.read_text(encoding="utf-8")), (status or {}).get("started_at"))
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 class WatcherMixin:
     """The watcher's life, as this layer asks about it."""
 
@@ -237,7 +251,11 @@ class WatcherMixin:
                 # now (memguard.py) - and, for one that does not, how it ended and when (how_it_ended):
                 # clean, stopped by the memory guard, or stopped unexpectedly in this sign-in; else None.
                 "memory_peak": (status or {}).get("memory_peak"),
-                "ended": ended, "ended_at": ended_at}
+                "ended": ended, "ended_at": ended_at,
+                # v0.6.26: what the running watcher's judge of its own looks says (domain/public.self_check) - that
+                # recovery cannot work here, an error code Codex reported that this version does not know, a layout
+                # this version has not been tested on - or None: of no other watcher, and never of one not running.
+                "self_check": read_self_check(self.paths, status) if running is True else None}
 
     def plugin_copy(self) -> dict:
         """Which edition is installed here, and which edition the copy of this plugin Codex keeps is

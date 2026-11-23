@@ -107,7 +107,7 @@ class AdvancedMirrorTests(unittest.TestCase):
 
     def setUp(self):
         if not self.answer:
-            self.fail("the probe did not run: " + (self.run_.stderr or self.run_.stdout)[-3000:])
+            self.fail(pagecase.ended(self.run_))
 
     def test_every_view_of_the_page_is_its_left_to_right_self_mirrored(self):
         for locale in RIGHT_TO_LEFT:

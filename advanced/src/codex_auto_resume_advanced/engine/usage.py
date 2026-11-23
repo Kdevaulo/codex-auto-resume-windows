@@ -140,10 +140,18 @@ def credit_resets(scoped, rows) -> dict:
 def _switched_at(paths):
     """When account_auto_switch last put another Codex account in, or None (v0.6.23 audit A-R4): a window the meter read
     before that is the old account's, so the pause holds nothing on it - or every recovery the switch was made for would
-    wait for the old account's reset through the switch's early window."""
+    wait for the old account's reset through the switch's early window. v0.6.26 (audit A2): or when a switch still
+    under way began - an account not read yet after the swap (UNVERIFIED), a put-back not made yet - since the swap
+    itself is the change, and switch.last is written only once the switch is known to have been made."""
     try:
         from ..profiles import Profiles
-        return Profiles(paths.home).last_switch_at()
+        profiles = Profiles(paths.home)
+        found = [profiles.last_switch_at()]
+        intent = profiles.intent()
+        if isinstance(intent, dict) and not intent.get("damaged"):
+            found.append(intent.get("at"))
+        found = [at for at in found if type(at) is int]
+        return max(found) if found else None
     except Exception:
         return None
 
@@ -242,9 +250,16 @@ class _Errand:
 
 
 # ---------------------------------------------------------------------------- the meter
+# v0.6.26 (the owner's logs, O1): why a look did not read, each a journal code of the meter's - the app closed (no process
+# of its package runs), the app running with no Codex server of the engine the watcher drives paired with it, or no
+# backend for that engine at all (its checks failed, or none was found).
+SKIP_CLOSED, SKIP_UNMATCHED, SKIP_NO_ENGINE = "app_closed", "unmatched", "no_engine"
+SKIPS = (SKIP_CLOSED, SKIP_UNMATCHED, SKIP_NO_ENGINE)
+
+
 class UsageMeter:
     """usage_meter's code: its P8 errand. `session` and `app_running` are seams a test fills."""
-    __slots__ = ("paths", "_scoped", "_session", "_app_running", "_looked")
+    __slots__ = ("paths", "_scoped", "_session", "_app_running", "_looked", "_why", "_said")
 
     def __init__(self, paths, *, session=None, app_running=None):
         self.paths = paths
@@ -252,6 +267,8 @@ class UsageMeter:
         self._session = session
         self._app_running = app_running
         self._looked = None
+        self._why = None              # why the last look did not read (SKIPS), or None
+        self._said = None             # the last such word journalled: once for each change, again after a read
 
     def bind(self, scoped):
         self._scoped = scoped
@@ -279,13 +296,32 @@ class UsageMeter:
         return changed is not None and changed > last
 
     def _running(self) -> bool:
-        """Whether the Codex app runs now: the meter reads only then (core's pairing, through the backend)."""
+        """Whether the Codex app runs now: the meter reads only then (core's pairing, through the backend). Where it does
+        not, `_why` says which of SKIPS stood in the way (v0.6.26, the owner's logs O1)."""
         if self._app_running is not None:
             return self._app_running() is True
         try:
-            return inuse.backend(self.paths).app_identity() is not None
+            backend = inuse.backend(self.paths)
         except Exception:
+            self._why = SKIP_NO_ENGINE
             return False
+        try:
+            paired = backend.app_identity()
+        except Exception:
+            paired = None
+        if paired is None:
+            self._why = SKIP_UNMATCHED if getattr(backend, "app_look", None) == "unmatched" else SKIP_CLOSED
+            return False
+        return True
+
+    def _skipped(self) -> None:
+        """A look that did not read, journalled once for each change of why (O1: from 2026-11-20 the meter read nothing
+        for 45 hours with the app running, and nothing anywhere said so - a meter that never reads looked like a meter
+        with nothing to do)."""
+        why, self._why = self._why, None
+        if why in SKIPS and why != self._said:
+            self._said = why
+            self._count(why)
 
     def _read(self):
         """One usage read through a finite session of the meter's own: the windows core keeps, or None."""
@@ -304,7 +340,9 @@ class UsageMeter:
             return None
         now = scoped.now()
         if not self._running():
+            self._skipped()
             return None
+        self._said = None
         self._looked = now
         try:
             found = self._read()

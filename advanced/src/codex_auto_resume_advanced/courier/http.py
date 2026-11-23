@@ -17,15 +17,18 @@ lets one that knows a longer answer is due, and bounds that, read more than MAX_
 A timeout is urllib's, for each read; every `request` also has its timeout plus WHOLE_MORE seconds in all, from its
 connection to the last byte read, and then its connection is shut (S1, the second security review of v0.6.23: a
 service that sends a byte just inside each read's timeout - Telegram's getUpdates waits 60 s a read - would hold the
-courier's poll for weeks). `stream` keeps the timeout for each read alone: a download takes as long as the line it
-comes down, its progress is real, and its size is bounded by its caller.
+courier's poll for weeks). `stream` has no time in all of its own: a download takes as long as the line it comes down,
+its progress is real, and its size is bounded by its caller - and so is its time, by the deadline `ends` the caller gives
+(v0.6.26, A7), at which its socket is shut.
 """
 from __future__ import annotations
 
+import _socket
 import http.client
 import socket
 import ssl
 import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -91,6 +94,14 @@ class _Whole:
         if sock is not None:
             try:                               # the socket's own shutdown: an SSLSocket's would drop its TLS state too
                 socket.socket.shutdown(sock, socket.SHUT_RDWR)
+            except (OSError, ValueError):
+                pass
+            # v0.6.26 (A7): on Windows a shutdown does not wake a read already waiting with a timeout - it waits its whole
+            # timeout out (measured: 5 s of 5) - but closing the handle does, at once. The handle itself, whatever reader
+            # still holds the socket object (a reply's makefile keeps a plain close from closing it); that reader then
+            # fails, which the caller reads as the time run out (`expired`).
+            try:
+                _socket.socket.close(sock)
             except (OSError, ValueError):
                 pass
 
@@ -227,13 +238,36 @@ def get(url, *, timeout=TIMEOUT, opener=None, headers=None, most=MAX_REPLY) -> b
     return request(url, None, headers, method="GET", timeout=timeout, opener=opener, most=most)
 
 
-def stream(url, take, *, timeout=TIMEOUT, opener=None, piece=STREAM_PIECE) -> None:
-    """GET `url`, handing `take` each piece of a 2xx answer as it arrives; `take` bounds it, by raising. Failed otherwise."""
+def _socket_of(reply):
+    """The socket a reply reads from (an HTTPResponse's buffered reader over its SocketIO), or None where it has none."""
+    raw = getattr(getattr(reply, "fp", None), "raw", None)
+    sock = getattr(raw, "_sock", None)
+    return sock if isinstance(sock, socket.socket) else None
+
+
+def stream(url, take, *, timeout=TIMEOUT, opener=None, piece=STREAM_PIECE, ends=None) -> None:
+    """GET `url`, handing `take` each piece of a 2xx answer as it arrives; `take` bounds it, by raising. Failed otherwise.
+
+    v0.6.26 (audit A7 / security S3): each piece is what one read of the socket brought (`read1`), not a whole
+    STREAM_PIECE - a buffered read waits for all of it, so a service that sent a byte inside each read's timeout held one
+    piece for days and `take` never saw its deadline. And where `ends` is given - the caller's deadline on the monotonic
+    clock - the reply's socket is shut when it comes (`_Whole`), so no read waits past it: Failed("timeout")."""
     reply = _opened(url, None, None, "GET", timeout, opener, whole=False)
+    whole = None
     try:
+        if ends is not None:
+            whole = _Whole(max(0.0, ends - time.monotonic()))
+            sock = _socket_of(reply)
+            if sock is not None:
+                whole.hold(sock)
         _well(reply)
+        read_some = getattr(reply, "read1", None)
+        if not callable(read_some):
+            read_some = reply.read
         while True:
-            read = reply.read(piece)
+            read = read_some(piece)
+            if whole is not None and whole.expired:
+                raise Failed("timeout")
             if not read:
                 return
             take(read)
@@ -241,7 +275,13 @@ def stream(url, take, *, timeout=TIMEOUT, opener=None, piece=STREAM_PIECE) -> No
         raise Failed("timeout") from None
     except ssl.SSLError:
         raise Failed("tls") from None
+    except (OSError, http.client.HTTPException):
+        if whole is not None and whole.expired:
+            raise Failed("timeout") from None
+        raise
     finally:
+        if whole is not None:
+            whole.cancel()
         close = getattr(reply, "close", None)
         if callable(close):
             try:

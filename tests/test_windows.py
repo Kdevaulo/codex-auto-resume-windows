@@ -82,7 +82,11 @@ class UsageTests(unittest.TestCase):
 
 class BackendTests(unittest.TestCase):
     def setUp(self):
-        self.backend = w.Backend(Path("state"), Path("codex.exe"))
+        # v0.6.26 (update resilience #4): a home that keeps a lock folder, as the app's does.
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        (Path(temp.name) / "thread-writer-locks").mkdir()
+        self.backend = w.Backend(Path(temp.name), Path("codex.exe"))
         self.compatible = patch.object(self.backend, "_compatible")
         self.compatible.start()
         self.addCleanup(self.compatible.stop)
@@ -573,23 +577,30 @@ class SeveralEngineChildrenTests(unittest.TestCase):
     def test_a_reused_pid_fails_closed(self):
         self.assertEqual(self.pair(self.rows(), [{"pid": 20, "created": 199}])[0], "process_identity_changed")
 
-    def test_one_child_is_paired_as_before_without_the_restart_manager(self):
-        for home in ("default", None):
-            with self.subTest(home=home):
-                pair, users = self.pair(self.rows(both=False), [], home=home)
+    def test_one_child_is_paired_as_before_where_no_engine_holds_the_databases(self):
+        """v0.6.26 (update resilience #2): one child is asked of the Restart Manager too, on the default home; holding
+        either database, or no Codex engine holding one, it is the server as it always was. With no home nothing is
+        asked."""
+        for holders in ([], [{"pid": 20, "created": 200}], [{"pid": 77, "created": 1}]):
+            with self.subTest(holders=holders):
+                pair, users = self.pair(self.rows(both=False), holders)
                 self.assertEqual(pair, {**self.identities[10], "server": self.identities[20]})
-                users.assert_not_called()
+                users.assert_called_once_with(self.home / "queue_1.sqlite", self.home / "state_5.sqlite")
+        pair, users = self.pair(self.rows(both=False), [], home=None)
+        self.assertEqual(pair, {**self.identities[10], "server": self.identities[20]})
+        users.assert_not_called()
 
     def test_a_same_path_process_under_another_parent_is_ignored(self):
         pair, users = self.pair(self.rows({"pid": 30, "parent": 99, "path": ENGINE}, both=False), [])
         self.assertEqual(pair["server"]["pid"], 20)
-        users.assert_not_called()
+        users.assert_called_once()
 
     def test_a_child_of_a_package_process_is_a_candidate_and_of_another_program_ignored(self):
         """v0.6.25 (#67, the owner's rule): a codex.exe under one of the package's own ChatGPT.exe processes under the
         main is the app's - Codex desktop 26.1117 runs its app server so - and the Restart Manager chooses between it
         and the main's own child; one under a ChatGPT.exe outside the package is ignored, as before."""
-        others = ({"pid": 11, "parent": 10, "path": STORE_APP}, {"pid": 31, "parent": 11, "path": ENGINE},
+        others = ({"pid": 11, "parent": 10, "path": STORE_APP, "created": 110},
+                  {"pid": 31, "parent": 11, "path": ENGINE, "created": 310},
                   {"pid": 40, "parent": 1, "path": r"C:\Elsewhere\ChatGPT.exe"},
                   {"pid": 41, "parent": 40, "path": ENGINE})
         pair, users = self.pair(self.rows(*others, both=False), [{"pid": 20, "created": 200}])
@@ -598,9 +609,10 @@ class SeveralEngineChildrenTests(unittest.TestCase):
         self.assertEqual(self.pair(self.rows(*others, both=False), [])[0], "desktop_server_missing_or_ambiguous")
         pair, users = self.pair(self.rows(*others[2:], both=False), [])
         self.assertEqual(pair["server"]["pid"], 20)
-        users.assert_not_called()
+        users.assert_called_once()
 
     def test_the_backend_asks_of_its_own_codex_home_and_loaded_holds_it_to_that_server(self):
+        (self.home / "thread-writer-locks").mkdir()
         backend = w.Backend(self.home, Path(ENGINE))
         rows = [dict(row, path=str(backend.codex_exe)) if row["path"] == ENGINE else row for row in self.rows()]
         with patch.object(backend, "_compatible"), \

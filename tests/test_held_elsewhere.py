@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -38,7 +39,14 @@ def rows(*extra):
 
 class LoadedTests(unittest.TestCase):
     def setUp(self):
-        self.backend = w.Backend(Path("state"), Path(ENGINE))
+        # v0.6.26 (update resilience #4): a home that keeps a lock folder, as the app's does.
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        (Path(temp.name) / "thread-writer-locks").mkdir()
+        self.backend = w.Backend(Path(temp.name), Path(ENGINE))
+        # v0.6.26 (update resilience #2 iv): the app's server holds Codex's databases, as it does beside a terminal's
+        # or VS Code's session (Backend.server_holds, what the pairing's look found).
+        self.server_holds = True
         for patcher in (patch.object(self.backend, "_compatible"),
                         patch.dict(os.environ, {"USERPROFILE": PROFILE, "ProgramW6432": r"C:\Program Files"})):
             patcher.start()
@@ -53,6 +61,7 @@ class LoadedTests(unittest.TestCase):
 
         def app_identity():
             self.backend._rows = list(inventory)
+            self.backend.server_holds = self.server_holds
             return dict(APP)
 
         def identity(pid):
@@ -109,6 +118,15 @@ class LoadedTests(unittest.TestCase):
 
     def test_no_holder_is_still_not_loaded(self):
         self.assertEqual(self.loaded([], rows()), "notLoaded")
+
+    def test_a_paired_server_holding_no_database_never_makes_it_another_sessions(self):
+        """v0.6.26 (update resilience #2 iv): where the paired server held neither of Codex's databases at the look -
+        #67's exec-server was such a one - the one holder is not called another session: unknown. Fails with the
+        rule reverted: "elsewhere"."""
+        self.server_holds = False
+        tui = {"pid": 30, "parent": 5, "path": ENGINE}
+        self.assertEqual(self.loaded([{"pid": 30, "created": 300}], rows(tui)), "unknown")
+        self.assertIsNone(self.backend.session_holder)
 
     def test_nothing_new_is_asked_of_windows(self):
         """The rows are the ones the app's pairing read: no second inventory is started for it."""

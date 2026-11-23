@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 import time
 
 from .. import config, homefind, homes, managed, notice_kinds, settings
@@ -225,6 +226,30 @@ class SettingsMixin:
 # K1): beside it, never over another; an uninstall that purges the settings takes it too (config.owned_state_files).
 SET_ASIDE_PREFIX = "settings.unreadable-"
 SET_ASIDE_GLOB = SET_ASIDE_PREFIX + "*.json"
+# v0.6.26 (owner 2026-11-22): the newest few are kept and a new copy deletes the older ones; only a plain file of
+# exactly the name `set_aside` makes (never a link), in the settings file's own folder.
+SET_ASIDE_KEEP = 5
+_SET_ASIDE_NAME = re.compile(re.escape(SET_ASIDE_PREFIX) + r"(\d{8}T\d{6}Z)(?:-(\d+))?\.json")
+
+
+def _prune_set_aside(folder: Path, made: Path) -> None:
+    """Delete all but the newest SET_ASIDE_KEEP copies in `folder`, oldest first; one that cannot be deleted stays.
+    `made`, the copy just made, is always one of those kept, whatever its name's time says against the others' (review
+    K4: a clock set back after five copies stamped later would otherwise delete the person's settings at once)."""
+    found = []
+    try:
+        for entry in folder.iterdir():
+            named = _SET_ASIDE_NAME.fullmatch(entry.name)
+            if named and entry.name != made.name and entry.is_file() and not config.is_link(entry):
+                found.append((named.group(1), int(named.group(2) or 0), entry))
+    except OSError:
+        return
+    found.sort(key=lambda item: item[:2])
+    for _stamp, _number, entry in found[:max(0, len(found) - (SET_ASIDE_KEEP - 1))]:
+        try:
+            entry.unlink()
+        except OSError:
+            pass
 
 
 def set_aside(path) -> Path | None:
@@ -239,6 +264,7 @@ def set_aside(path) -> Path | None:
         try:
             if not aside.exists():
                 os.rename(target, aside)            # never replaces on Windows: a name taken meanwhile tries the next
+                _prune_set_aside(target.parent, aside)
                 return aside
         except FileExistsError:
             continue

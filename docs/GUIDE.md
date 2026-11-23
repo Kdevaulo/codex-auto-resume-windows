@@ -303,14 +303,15 @@ or advanced. Two editions side by side are not possible - one watcher per Codex 
 sign-in entry - so it always replaces the installation its window belongs to. It sends nothing to
 Codex, and nothing else offers it: not the watcher, not the panel inside Codex, not Codex's tools.
 
-When you press it, it asks GitHub for this repository's whole list of releases, up to five pages of
-thirty, and asks nothing before that. It shows every version from v0.6.2 on in each edition it was
+When you press it, it asks GitHub for this repository's whole list of releases, up to twenty pages of
+thirty - it stops at the first page that is short or that reaches below v0.6.2, and the whole reading has
+400 seconds - and asks nothing before that. It shows every version from v0.6.2 on in each edition it was
 published in, newest first; the advanced edition begins with v0.6.11-alpha. A version it cannot install
 stays in the list, greyed, and says why: it is the version you have; no archive of that edition was
 published under that number; there is no checksum to check it against; its installer predates editions,
 so the edition has to be changed first; or your administrator's policy is set and that version does
-not keep it ([below](#settings-an-administrator-manages)). If GitHub cannot be asked, or its answer
-cannot be read, it says so and lists nothing. Versions before v0.6.2 are not offered: from v0.6.0 and
+not keep it ([below](#settings-an-administrator-manages)). If GitHub cannot be asked, its answer
+cannot be read, or the list goes on past the twentieth page, it says so and lists nothing. Versions before v0.6.2 are not offered: from v0.6.0 and
 v0.6.1 the Dashboard cannot check a download, and v0.5 installers do not keep a paused recovery paused,
 so from them the Dashboard could not bring you back.
 
@@ -508,9 +509,10 @@ waiting there; **Remove words for this time** takes them away at once, as in the
 <img src="images/dashboard-pending.png" alt="The Pending page of the Dashboard: two conversations waiting, one for the usage reset and one with a retry scheduled, each with a state chip and an Auto-resume switch, the Why it is waiting checklist for the selected task, and Retry now, Cancel, Timeline, Turn off for this conversation and Cancel all buttons" width="680">
 
 From v0.6.11 the Overview's **Waiting** card, **Why it is waiting** for a usage limit, the
-notification-area popup, the panel in Codex and `get_status` also show Codex's usage as the watcher
+notification-area popup and the panel in Codex also show Codex's usage as the watcher
 last read it, with how long ago: each window's length, how much of it is left and when it resets -
 "Codex usage, read 2m ago: 5-hour 0% left, resets 14:42 · weekly 38% left, resets 2027-01-18 13:00".
+`get_status` returns the same reading with each window's share used, as Codex reported it, not what is left.
 Since v0.6.24 the places you glance at to see whether you may keep going say what is left - 100 minus the whole
 share used, so 0% only once a window is used up (99.6% used leaves 1%) - where they said how much was used before; a
 bar is as full as what is left and empties as the window is used. Places about pace, history, diagnosis and the limits
@@ -539,8 +541,10 @@ are waiting, how many are running in Codex and how long until the next check - o
 seen it, that a recovery failed.
 
 From v0.6.11 every place that shows the version also names the Advanced edition when it is the one
-installed, in the interface language: the version at the foot of the Dashboard, the Version row on
-its Diagnostics page and the heading of the panel in Codex, each with the edition after the version
+installed, in the interface language: the version in a pill at the end of the Dashboard's page tabs (the number
+alone, without its "v", where the Advanced edition is told by the number's blue ink instead of a word; it is
+shown only where the tabs leave it room), the Version row on its Diagnostics page, which always has
+it, and the heading of the panel in Codex, those two with the edition after the version
 in smaller grey text (`v0.6.11` *Advanced*). The icon's tooltip names it after the product's name.
 From v0.6.14 the Standard edition shows the version alone in each of those places, and the product's
 name alone in the tooltip. Its name appears only where editions are told apart: where you choose one,
@@ -1074,7 +1078,9 @@ General > Notifications, lists each kind of notification - an interruption detec
 starting, resumed, could not resume, stopped trying, cancelled, a conversation that needs you, tasks
 waiting after a long sleep, the watcher's memory, and the power action after usage-limit recoveries;
 the advanced edition adds its usage meter's warning, each of its three notices about a stop near a
-limit and its weekly update check's offer of a newer version - and a kind ticked there stays on screen until
+limit, its weekly update check's offer of a newer version, the crash restart's notice that it left the watcher
+stopped, the account switch's two notices and the Python choice's notice that it went back to the bundled
+Python, and each other notice it raises, as EDITIONS.md says - and a kind ticked there stays on screen until
 you click it or a newer notification needs its place (at most three cards stack, and the oldest is pushed
 out): the card stays beside the notification area, and Windows' own notification stays as a
 reminder until you close it, with a button to close it where it has none. None is ticked at first.
@@ -1465,7 +1471,7 @@ then, which is no surprise.
 `status.json` in its settings folder (`config\`) after every check and once more as it stops: whether
 it runs, whether recovery is on, paused or observing only, the compatibility word for the Codex
 engine, how many recoveries are pending at each state and when the next is looked at, and Codex's
-usage as last read - the same numbers the Overview shows. It holds no conversation or record id, no
+usage as last read - each window's share used, its length and its reset, the reading the Overview's line is made from. It holds no conversation or record id, no
 name or title and no path, is written whole or not at all, and nothing in this product reads it: it
 is there for a status bar or a script of your own, which can read it without a port, a server or a
 question to this product. A file that says `running` and has not changed for minutes belongs to a
@@ -1863,7 +1869,7 @@ to wherever your other Git marketplaces are hosted:
   release is newest, with one `HEAD` request that reads no page. From v0.6.11 it then reads
   GitHub's list of this repository's ten newest releases from api.github.com, with one `GET` that
   carries nothing about your machine, for a newer pre-release, which it only offers. *Install another
-  version...* on the same page reads that list too, all of it, with up to five `GET` requests of thirty
+  version...* on the same page reads that list too, all of it, with up to twenty `GET` requests of thirty
   releases each to one more api.github.com address, when you press it and again when you confirm a
   version; then it downloads only the archive you confirmed, and its `.sha256` where no digest is pinned.
   Whether an administrator's policy is set it reads from this PC's registry, and sends nowhere. From v0.6.5, *Refresh

@@ -110,99 +110,99 @@
       "passed": true,
       "worst": 0
     },
-    "window": "2fd7240f8782c0a294c8a3dd969f88ce6e30189101ebd0e33726b66312834161"
+    "window": "a7b4873087b3c8ab69454b1c040bf1396b0e9234a72ff5ca8417e4a429ed28d6"
   },
   "images": {
     "docs/images/advanced-page-after-ko.png": {
-      "sha256": "4bba387327fb2949249e6ccb2e84bac79fa97ab495c0646254c72d5856987b18",
+      "sha256": "413f6998ccff0f8d0fdaa8b99e9347b2c9954e06ab25aade09fccde7e66b4a58",
       "size": "1500x927"
     },
     "docs/images/advanced-page-after.png": {
-      "sha256": "cd213b0cdf708665c06237a70451a2128ef56ee00f24ef022f62ccf9843fd504",
+      "sha256": "8c9231becbae21f6c73e22bfc4b9a4b7c27ad0aec81ee7b4aee3f3a0c5c2b0de",
       "size": "1500x927"
     },
     "docs/images/advanced-page-before-ko.png": {
-      "sha256": "65529a9f7f6a59154acbca8491f1799ae7a1c8432ca3611fc2aceeae53b74edc",
+      "sha256": "cad077f8ed60d52303843f9731f794969ceba888e4f38ff27ae9b99e876ca84a",
       "size": "1500x927"
     },
     "docs/images/advanced-page-before.png": {
-      "sha256": "e88094fdc7554bbb574f7c35fc0dc48f208da3b0d7dad31f5b5f83101ed74991",
+      "sha256": "b32e5e278961de95a95c0299053baa1296d694b6a8c71d07ec29403cd800301d",
       "size": "1500x927"
     },
     "docs/images/advanced-pause-after-ko.png": {
-      "sha256": "dc4fa0af823285546d1eb1621cbbba748a1939e107c21cbc5857c563c9c99d84",
+      "sha256": "53a6430bbee43696df8c3fcf5504369d408f0131164e55fc7bb1c07c44430c23",
       "size": "1500x927"
     },
     "docs/images/advanced-pause-after.png": {
-      "sha256": "9f1397267e1e798f2ea726ec327a6674e3a029924822b45e7c131e2d5af910fb",
+      "sha256": "441e5cb3abe718ef8cd6bd5d928a94768af61bee452630a91cd0e22176e58e2f",
       "size": "1500x927"
     },
     "docs/images/advanced-pause-before-ko.png": {
-      "sha256": "65529a9f7f6a59154acbca8491f1799ae7a1c8432ca3611fc2aceeae53b74edc",
+      "sha256": "cad077f8ed60d52303843f9731f794969ceba888e4f38ff27ae9b99e876ca84a",
       "size": "1500x927"
     },
     "docs/images/advanced-pause-before.png": {
-      "sha256": "e88094fdc7554bbb574f7c35fc0dc48f208da3b0d7dad31f5b5f83101ed74991",
+      "sha256": "b32e5e278961de95a95c0299053baa1296d694b6a8c71d07ec29403cd800301d",
       "size": "1500x927"
     },
     "docs/images/advanced-report-ko.png": {
-      "sha256": "6b218f4de10342cc3e21ca21a8375a5e305fa57102101767e78791d223f39551",
+      "sha256": "8ef71207c5b808e698f36008306cc37c6aa564adc4011e57ad3e2c006243abfe",
       "size": "1500x927"
     },
     "docs/images/advanced-report.png": {
-      "sha256": "1075f2c6dbb69455d5e1b653f1a13eeb9901f634aa8dffb44273eb1daf703d62",
+      "sha256": "e21b17f95ba9217f6f452e5f8db90fa24084e89c0523387050f9c344d6e3a687",
       "size": "1500x927"
     },
     "docs/images/advanced-scheduled-after-ko.png": {
-      "sha256": "88662ae4294596cfaec183e3807a0a3c68475a2fcefa7a87ea309e674a715f78",
+      "sha256": "4d2a7ddab79e97fe20a8f8e4368fbf7c6722bce965697a576ac7936c55679810",
       "size": "1500x927"
     },
     "docs/images/advanced-scheduled-after.png": {
-      "sha256": "6e304cf5bd5dded255d114b2f4f3934e491acfe8de5ba6010f23c0dbee438a86",
+      "sha256": "440fc4b6140ef2f470cfff1f7cc4a4211b87e1855014576abc7fa640f03fd998",
       "size": "1500x927"
     },
     "docs/images/advanced-scheduled-before-ko.png": {
-      "sha256": "396a7341c41b9a4d6918009e7643daad4acff3f65d2e1d90369394638fb70cb8",
+      "sha256": "c1cb5e484b1e1674a49638c12a5a2681be48403e1decb398fa10530f2f21a0ed",
       "size": "1500x927"
     },
     "docs/images/advanced-scheduled-before.png": {
-      "sha256": "e4d39f5b79a04e091be76da7a64674ec6cb6fd659019c06fd0ee30af46f06940",
+      "sha256": "1f2d38e7180b6af7b5305802532a6877ed237ad15d485fcb5bd04670bd813486",
       "size": "1500x927"
     },
     "docs/images/advanced-usage-numbers-ko.png": {
-      "sha256": "9ba3a8555f5d69f38b165d16b95552b5ef41f1469e30dcf066ed89ed92a76204",
+      "sha256": "fffca7d6b4eb6c208b7cd968a5fa12d0a0f3eba1137eb54d2eaec644374942be",
       "size": "1500x927"
     },
     "docs/images/advanced-usage-numbers.png": {
-      "sha256": "143cfb729ba6cc2a1f027ccb1427f9e7af48de9cf935e0c99075dd86bf4d1741",
+      "sha256": "a647d0d9e59178b69529eafea63235a026f1c81e80efbf8dc8c225e493419526",
       "size": "1500x927"
     }
   },
   "inputs": {
-    "<advanced shot:P1-after:en>": "de2da352a715b2711f68e5082fcaca46c13185ba205a778dfb229112c45879fa",
-    "<advanced shot:P1-after:ko>": "e879ec69351ba96b76806c6b3098d466b7bbaefe8d24a66e07ec490551876496",
-    "<advanced shot:P1-before:en>": "82f5b1f3a909319331a389e1a5519f18d56c82c5a6e713bba443ae57130bf3dc",
-    "<advanced shot:P1-before:ko>": "3145d4a272d7259c655db782010294865c28d8e3ce5ce0cc29867669d70f6e58",
-    "<advanced shot:P4-after:en>": "8185e0c111e12f04137dcbf91ce889b88b1e32e17a437e397dfef24befa62e02",
-    "<advanced shot:P4-after:ko>": "f6e461dbc131150c30549b8a7b10a24ecb52392efac4e35039e46444a8814263",
-    "<advanced shot:P4-before:en>": "44cbc70b4febf513402d2ad52224a1e9a6bbf2af6eb2762ef5a8954ad3e71451",
-    "<advanced shot:P4-before:ko>": "83e7ca1dab9ed1b83d5fbe1f528a4cd91068a2dfbff77c8ec18b09a276f0b825",
-    "<advanced shot:P5:en>": "bb5681ae0bed3c138182fa13f183e283a34f3bf77650f54bd21c547c4498eaa2",
-    "<advanced shot:P5:ko>": "4362871a5e3b656743f878646579d507541cc2d1721534eef5cb460da6760102",
-    "<advanced shot:P7-after:en>": "3d7ef5bc96ad608ecc3cfb725563ea6d3898dd31be157f595955996025cd1dfc",
-    "<advanced shot:P7-after:ko>": "d17aac4fd51be71dbeb149a0d9717e97ca10c349ef244644f9541e83d51cfd6e",
-    "<advanced shot:P7-before:en>": "e9c36ccd85d035c30827f25c85de5e5b4cf3492758781a8e2bc9ebb27f7c6ee2",
-    "<advanced shot:P7-before:ko>": "51862e44e85cc371cd371b6f85273caf048577e91d27a1d9d32d3b4850e6af9e",
-    "<advanced shot:P8:en>": "7498ae951bd96f826a241aae4a3029430011f2c52cd786ea2c3f89dc8576deb7",
-    "<advanced shot:P8:ko>": "198b51c875c7931eaecefe96865d1e4e4235b202b540c23f806a015444822ce2"
+    "<advanced shot:P1-after:en>": "7f209406f3231fdd6e17335d7b94b7751d4763e10231b39be69481a26fadac78",
+    "<advanced shot:P1-after:ko>": "034e7e7277c03225e6c92731b75b4aa744501a7fa4a832b22bff186294ca51b5",
+    "<advanced shot:P1-before:en>": "891f43276ce0fc2804dbbdf675d69330870f98117d9e848e7ffacc0415f5e5aa",
+    "<advanced shot:P1-before:ko>": "22f9c7fd0e34832c7b41d4dce166bd1c2d8eb2935826227e37325739d4ac5a86",
+    "<advanced shot:P4-after:en>": "5e24048a00c4f973da587b281eaf267dec309ce72d674a4795f4b08b640a3fff",
+    "<advanced shot:P4-after:ko>": "127b29f349121a0179d34be406f9265b508412fe5430f380dea23004f83a3560",
+    "<advanced shot:P4-before:en>": "60508f3b67a712711625c1cfaffb708ebcd1a61d27445ad147a15460fd9e8689",
+    "<advanced shot:P4-before:ko>": "8ebd8f6a17719605a53d183c237c3db4b0af7165e1e8feafd74624782b553c72",
+    "<advanced shot:P5:en>": "5b8b2a62fc68d75321ba04887407e5d618802e1eb2a45099162faa744799336c",
+    "<advanced shot:P5:ko>": "7f3e9a9070d12a414888e53db428496f33579d22c27abcc3ac51f10684b6d35e",
+    "<advanced shot:P7-after:en>": "03b79be81e44e8f65bfb3e46c1c31292e2d709488800961583939250c880bb86",
+    "<advanced shot:P7-after:ko>": "c90f2d756d405b762c045552e99b5b8a22afe3d6e242ea57e3011a4280d49628",
+    "<advanced shot:P7-before:en>": "f103419f06ed003c41aa30195c0384d9efcda78ab5506d497c37139313cf96e9",
+    "<advanced shot:P7-before:ko>": "95d99e64d96ace7780554f906c306cc3fba96fba7b0099bc223603986c8e2269",
+    "<advanced shot:P8:en>": "d84125bb7be7d57045fc4314d4600837eb04ce8c47a8617a6f8666b1572e1da6",
+    "<advanced shot:P8:ko>": "72770bbb484974e7c1994034242831052fb0f37a94f5df6ee9c1d33f64e25389"
   },
   "parts": {
     "<advanced shot:P1-after:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "59efdfd082cea30e",
-      "04 dashboard": "4f8a47cc823f8f61",
+      "03 status": "808b8f59a20b3dcd",
+      "04 dashboard": "b7bcaf8da0a9fe59",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -224,8 +224,8 @@
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "89da2753c8535cb1",
-      "115 advanced-report-check": "bfdbe04ad645668b",
+      "114 advanced-report-job": "ee313103347e3646",
+      "115 advanced-report-check": "6f554466729cb101",
       "116 advanced-report-job": "86c6ba3742dfe498",
       "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "480e6404465ef8aa",
@@ -257,7 +257,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "bd578bfa8e0e8122",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "4cb11fb78c815a73",
+      "42 advanced-statement": "8d8cc287f2b0f1e2",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "dce266dfadf6100f",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -317,11 +317,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P1-after:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "59efdfd082cea30e",
-      "04 dashboard": "4f8a47cc823f8f61",
+      "03 status": "808b8f59a20b3dcd",
+      "04 dashboard": "b7bcaf8da0a9fe59",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -343,8 +343,8 @@
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "89da2753c8535cb1",
-      "115 advanced-report-check": "bfdbe04ad645668b",
+      "114 advanced-report-job": "ee313103347e3646",
+      "115 advanced-report-check": "6f554466729cb101",
       "116 advanced-report-job": "86c6ba3742dfe498",
       "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "480e6404465ef8aa",
@@ -376,7 +376,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "32a311669e6c734a",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "f5652d1786f1d93d",
+      "42 advanced-statement": "0e4618b7e44adbac",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "ed6ae8c7b276a286",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -436,11 +436,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P1-before:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "50f244183dccf532",
-      "04 dashboard": "ce57b16f81a1efac",
+      "03 status": "5245f5d9248d1933",
+      "04 dashboard": "4b875b768d11df9f",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -450,11 +450,11 @@
       "11 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P1-before:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "50f244183dccf532",
-      "04 dashboard": "ce57b16f81a1efac",
+      "03 status": "5245f5d9248d1933",
+      "04 dashboard": "4b875b768d11df9f",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -464,11 +464,11 @@
       "11 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P4-after:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "59efdfd082cea30e",
-      "04 dashboard": "4f8a47cc823f8f61",
+      "03 status": "808b8f59a20b3dcd",
+      "04 dashboard": "b7bcaf8da0a9fe59",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -490,8 +490,8 @@
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "89da2753c8535cb1",
-      "115 advanced-report-check": "bfdbe04ad645668b",
+      "114 advanced-report-job": "ee313103347e3646",
+      "115 advanced-report-check": "6f554466729cb101",
       "116 advanced-report-job": "86c6ba3742dfe498",
       "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "480e6404465ef8aa",
@@ -523,7 +523,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "bd578bfa8e0e8122",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "4cb11fb78c815a73",
+      "42 advanced-statement": "8d8cc287f2b0f1e2",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "dce266dfadf6100f",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -583,11 +583,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P4-after:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "59efdfd082cea30e",
-      "04 dashboard": "4f8a47cc823f8f61",
+      "03 status": "808b8f59a20b3dcd",
+      "04 dashboard": "b7bcaf8da0a9fe59",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -609,8 +609,8 @@
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "89da2753c8535cb1",
-      "115 advanced-report-check": "bfdbe04ad645668b",
+      "114 advanced-report-job": "ee313103347e3646",
+      "115 advanced-report-check": "6f554466729cb101",
       "116 advanced-report-job": "86c6ba3742dfe498",
       "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "480e6404465ef8aa",
@@ -642,7 +642,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "32a311669e6c734a",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "f5652d1786f1d93d",
+      "42 advanced-statement": "0e4618b7e44adbac",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "ed6ae8c7b276a286",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -702,11 +702,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P4-before:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "50f244183dccf532",
-      "04 dashboard": "ce57b16f81a1efac",
+      "03 status": "5245f5d9248d1933",
+      "04 dashboard": "4b875b768d11df9f",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -716,11 +716,11 @@
       "11 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P4-before:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "50f244183dccf532",
-      "04 dashboard": "ce57b16f81a1efac",
+      "03 status": "5245f5d9248d1933",
+      "04 dashboard": "4b875b768d11df9f",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -730,11 +730,11 @@
       "11 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P5:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "59efdfd082cea30e",
-      "04 dashboard": "4f8a47cc823f8f61",
+      "03 status": "808b8f59a20b3dcd",
+      "04 dashboard": "b7bcaf8da0a9fe59",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -756,8 +756,8 @@
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "89da2753c8535cb1",
-      "115 advanced-report-check": "bfdbe04ad645668b",
+      "114 advanced-report-job": "ee313103347e3646",
+      "115 advanced-report-check": "6f554466729cb101",
       "116 advanced-report-job": "86c6ba3742dfe498",
       "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "480e6404465ef8aa",
@@ -789,7 +789,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "bd578bfa8e0e8122",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "4cb11fb78c815a73",
+      "42 advanced-statement": "8d8cc287f2b0f1e2",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "dce266dfadf6100f",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -849,11 +849,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P5:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "59efdfd082cea30e",
-      "04 dashboard": "4f8a47cc823f8f61",
+      "03 status": "808b8f59a20b3dcd",
+      "04 dashboard": "b7bcaf8da0a9fe59",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -875,8 +875,8 @@
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "89da2753c8535cb1",
-      "115 advanced-report-check": "bfdbe04ad645668b",
+      "114 advanced-report-job": "ee313103347e3646",
+      "115 advanced-report-check": "6f554466729cb101",
       "116 advanced-report-job": "86c6ba3742dfe498",
       "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "480e6404465ef8aa",
@@ -908,7 +908,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "32a311669e6c734a",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "f5652d1786f1d93d",
+      "42 advanced-statement": "0e4618b7e44adbac",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "ed6ae8c7b276a286",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -968,11 +968,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P7-after:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "e37f11373110b6c4",
-      "04 dashboard": "596102e0272ee082",
+      "03 status": "7e9682f3c2314013",
+      "04 dashboard": "73cf349c5e6b7f42",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1023,7 +1023,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "bd578bfa8e0e8122",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "4cb11fb78c815a73",
+      "42 advanced-statement": "8d8cc287f2b0f1e2",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "dce266dfadf6100f",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -1083,11 +1083,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P7-after:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "e37f11373110b6c4",
-      "04 dashboard": "596102e0272ee082",
+      "03 status": "7e9682f3c2314013",
+      "04 dashboard": "73cf349c5e6b7f42",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1138,7 +1138,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "32a311669e6c734a",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "f5652d1786f1d93d",
+      "42 advanced-statement": "0e4618b7e44adbac",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "ed6ae8c7b276a286",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -1198,11 +1198,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P7-before:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "50f244183dccf532",
-      "04 dashboard": "ce57b16f81a1efac",
+      "03 status": "5245f5d9248d1933",
+      "04 dashboard": "4b875b768d11df9f",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1212,11 +1212,11 @@
       "11 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P7-before:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "50f244183dccf532",
-      "04 dashboard": "ce57b16f81a1efac",
+      "03 status": "5245f5d9248d1933",
+      "04 dashboard": "4b875b768d11df9f",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1226,11 +1226,11 @@
       "11 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P8:en>": {
-      "00 strings": "0febff40b34b95f2",
+      "00 strings": "9764587176860b3c",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "e37f11373110b6c4",
-      "04 dashboard": "596102e0272ee082",
+      "03 status": "7e9682f3c2314013",
+      "04 dashboard": "73cf349c5e6b7f42",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1281,7 +1281,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "bd578bfa8e0e8122",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "4cb11fb78c815a73",
+      "42 advanced-statement": "8d8cc287f2b0f1e2",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "dce266dfadf6100f",
       "45 advanced-watch-log": "11b0e593fd406aa2",
@@ -1341,11 +1341,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P8:ko>": {
-      "00 strings": "074a41448ecd6020",
+      "00 strings": "9ebdf895843eb803",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "e37f11373110b6c4",
-      "04 dashboard": "596102e0272ee082",
+      "03 status": "7e9682f3c2314013",
+      "04 dashboard": "73cf349c5e6b7f42",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1396,7 +1396,7 @@
       "39 advanced-watch-log": "d6e7c95981534d78",
       "40 advanced-statement": "32a311669e6c734a",
       "41 advanced-watch-log": "e3ae3b809cc65a42",
-      "42 advanced-statement": "f5652d1786f1d93d",
+      "42 advanced-statement": "0e4618b7e44adbac",
       "43 advanced-watch-log": "97c6b9dfa5649900",
       "44 advanced-statement": "ed6ae8c7b276a286",
       "45 advanced-watch-log": "11b0e593fd406aa2",

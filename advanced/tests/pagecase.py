@@ -143,6 +143,22 @@ foreach ($job in $jobs) {
 """
 
 
+def ended(run) -> str:
+    """Why a probe's process gave no answers, for every test of the module to say: stopped at its time limit, or ended
+    with its exit code - and the exception that ended it, named first, then the end of what it wrote. A job's own throw
+    is caught and answered (PROBE); what kills the process is not: an exception in a window's own message handling (dev
+    run 44990528966, test_advanced_page_scheduled: an AccessViolationException in WindowCorner.Reshape under
+    SettingsForm.WndProc) ends it before any answer is written, and each test said only "the probe did not run"."""
+    text = run.stderr or run.stdout or ""
+    thrown = next((line.strip() for line in text.splitlines() if "Exception" in line), "")
+    if getattr(run, "stopped", None) is not None:
+        how = "was stopped after %d s" % run.stopped
+    else:
+        how = "ended with exit code %s" % (run.returncode if run.returncode is None or 0 <= run.returncode < 256
+                                           else "0x%08X" % (run.returncode & 0xFFFFFFFF))
+    return "the probe did not run: its process %s%s\n%s" % (how, (": " + thrown) if thrown else "", text[-3000:])
+
+
 def deal_out(costs: list, workers: int) -> list:
     """The indexes of `costs` in `workers` shares: longest first, each to the share with the least so far (the
     lowest-numbered on a tie), so one long audit is not left behind several others in one process (v0.6.17: the
@@ -178,13 +194,17 @@ def probe(work: Path, exe: Path, jobs: list, timeout: int, workers: int = 1) -> 
         running.append((process, result))
     done, found = [], {}
     for process, result in running:
+        stopped = None
         try:
             out, err = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
             process.kill()
             out, err = process.communicate()
-        done.append(subprocess.CompletedProcess(process.args, process.returncode, out.decode("utf-8", "replace"),
-                                                err.decode("utf-8", "replace")))
+            stopped = timeout
+        run = subprocess.CompletedProcess(process.args, process.returncode, out.decode("utf-8", "replace"),
+                                          err.decode("utf-8", "replace"))
+        run.stopped = stopped
+        done.append(run)
         if process.returncode == 0 and result.is_file():
             found.update(json.loads(result.read_text(encoding="utf-8-sig")))
     failed = [run for run in done if run.returncode != 0]
@@ -314,7 +334,7 @@ class PageCase(unittest.TestCase):
 
     def setUp(self):
         if not self.results:
-            self.fail("the probe did not run: " + (self.run_.stderr or self.run_.stdout)[-3000:])
+            self.fail(ended(self.run_))
 
     def of(self, name) -> tuple:
         """What the page did in one scenario, and what the bridge said while it was made."""
@@ -665,7 +685,7 @@ class LayoutCase(unittest.TestCase):
 
     def setUp(self):
         if not self.answer:
-            self.fail("the probe did not run: " + (self.run_.stderr or self.run_.stdout)[-3000:])
+            self.fail(ended(self.run_))
 
     def test_nothing_is_cut_off_in_any_language_at_any_scaling(self):
         self.assertTrue(self.JOBS, "this module audits nothing")

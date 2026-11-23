@@ -438,7 +438,9 @@ class NotARecoveryEngineTests(ControlTestCase):
                        "codex_auto_resume/checkup.py",
                        # v0.6.16: and so does Rescan and reconcile, with no backend and no store (rescan.py, the
                        # watcher's item too): control only applies what it is handed (issue #39).
-                       "codex_auto_resume/rescan.py"},
+                       "codex_auto_resume/rescan.py",
+                       # v0.6.26: the watch loop's judge of its own looks (engine/impossible.py), pure.
+                       "codex_auto_resume/runtime/loop.py"},
             # Since v0.6.10-alpha the engine is a package, and the one module of it that reads
             # Codex directly is `engine/detect.py` - the exception `tests/test_layers.py`
             # names, in the place it now lives.
@@ -453,7 +455,12 @@ class NotARecoveryEngineTests(ControlTestCase):
                          # v0.6.16-beta.3: and the check reads each Codex home it knows (checkup.py).
                          "codex_auto_resume/checkup.py",
                          # v0.6.16: and Rescan and reconcile reads each Codex home it knows (rescan.py).
-                         "codex_auto_resume/rescan.py"},
+                         "codex_auto_resume/rescan.py",
+                         # v0.6.26: and the watch loop's self-check asks who holds the newest databases and whether the
+                         # app runs (runtime/loop.py); the health check asks the latter where no engine is found
+                         # (commands/status.py); the protocol checks read what Codex's helper last met (compat/probes.py).
+                         "codex_auto_resume/runtime/loop.py", "codex_auto_resume/commands/status.py",
+                         "codex_auto_resume/compat/probes.py"},
         }, "the set of modules that reach the engine or the source has changed")
 
 

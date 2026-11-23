@@ -555,6 +555,10 @@ namespace CodexAutoResume
     /// probe without a probe date (DayArt.On), or while the pill is not on the screen. Under battery saver or a locked
     /// session (Motion.Ambient) it holds still - the pill at rest, the ring where it was - and asks once a second whether
     /// that is over, as the day's scene does (SoftDayScene). A timer only while it can be seen moving.
+    /// v0.6.26 (audit D11): the nudge moves smoothly - not in whole pixels (four places, 90 ms apart, at 100 %): the pill
+    /// is placed in whole pixels (Nudge, the lift rounded up) and draws itself the rest of a pixel lower (Offset), so it
+    /// stands exactly Lift up at every frame; and battery saver starting in the middle of a nudge lets that nudge ease to
+    /// rest before the pill holds, never a drop of up to 3 px in one frame.
     internal sealed class PillHint : IDisposable
     {
         internal const int NudgeMs = 7000, RingMs = 4000;
@@ -564,7 +568,7 @@ namespace CodexAutoResume
         private readonly Timer timer = new Timer();
         private readonly Stopwatch clock = new Stopwatch();
         private string look;
-        private int nudge;
+        private double lift;
         private double ring;
 
         /// Told each time the nudge or the ring changes - whether the nudge did, so the pill is placed again - to repaint it.
@@ -580,11 +584,26 @@ namespace CodexAutoResume
         /// The day it hints for, or null (an ordinary day).
         internal string Look { get { return look; } }
 
-        /// How far up the pill stands now, in pixels; how strong its ring is, 0 to 1; whether it moves; whether it is held.
-        internal int Nudge { get { return nudge; } }
+        /// How far up the pill stands now, in device pixels: in whole pixels (Nudge, where it is placed: the lift rounded up),
+        /// and exactly (Lift), the rest of a pixel drawn inside it (Offset, 0 to below 1, down); how strong its ring is, 0 to
+        /// 1; whether it moves; whether it is held.
+        internal int Nudge { get { return RiseOf(lift); } }
+        internal double Lift { get { return lift; } }
+        internal float Offset { get { return OffsetOf(lift); } }
         internal double Ring { get { return ring; } }
         internal bool Moving { get { return timer.Enabled; } }
         internal bool Held { get { return timer.Enabled && timer.Interval == StillBeat; } }
+
+        /// The whole pixels a pill `lift` up is placed up by, and how far below that it draws itself: Rise - Offset = lift.
+        internal static int RiseOf(double lift)
+        {
+            return lift <= 0.001 ? 0 : (int)Math.Ceiling(lift - 0.001);
+        }
+
+        internal static float OffsetOf(double lift)
+        {
+            return (float)Math.Max(0.0, RiseOf(lift) - lift);
+        }
 
         /// The board's car-nudge at `ms`, in pixels at 100 %: at rest for 86 % of the 7 s, then up 3, down, up 1 and down.
         internal static double NudgeAt(double ms)
@@ -623,11 +642,11 @@ namespace CodexAutoResume
                 timer.Start();
                 Beat();
             }
-            else if (!wanted && (timer.Enabled || nudge != 0 || ring != 0))
+            else if (!wanted && (timer.Enabled || lift != 0 || ring != 0))
             {
                 timer.Stop();
                 clock.Reset();
-                Set(0, 0.0);
+                Set(0.0, 0.0);
             }
         }
 
@@ -638,7 +657,10 @@ namespace CodexAutoResume
                 Follow(look);
                 return;
             }
-            bool still = Motion.Ambient;
+            // Battery saver or a locked session: held - but a nudge under way first eases to rest (Settling), the ring held
+            // where it was meanwhile.
+            bool settling = Settling(Motion.Ambient, lift);
+            bool still = Motion.Ambient && !settling;
             if (still != (timer.Interval == StillBeat))
             {
                 timer.Interval = still ? StillBeat : FrameBeat;
@@ -646,14 +668,20 @@ namespace CodexAutoResume
                 else clock.Start();
             }
             double ms = clock.Elapsed.TotalMilliseconds;
-            Set(still ? 0 : (int)Math.Round(NudgeAt(ms) * Soft.PxF(1)), RingAt(ms));
+            Set(still ? 0.0 : NudgeAt(ms) * Soft.PxF(1), still || settling ? ring : RingAt(ms));
         }
 
-        private void Set(int up, double level)
+        /// Whether a pill `lift` up when motion is to hold (`ambient`) is still on its way to rest: it holds once there.
+        internal static bool Settling(bool ambient, double lift)
         {
-            if (up == nudge && Math.Abs(level - ring) < 0.01) return;
-            bool moved = up != nudge;
-            nudge = up;
+            return ambient && lift > 0.001;
+        }
+
+        private void Set(double up, double level)
+        {
+            if (Math.Abs(up - lift) < 0.01 && Math.Abs(level - ring) < 0.01) return;
+            bool moved = RiseOf(up) != RiseOf(lift);
+            lift = up;
             ring = level;
             if (Changed != null) Changed(moved);
         }

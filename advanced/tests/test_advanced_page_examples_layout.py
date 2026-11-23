@@ -21,6 +21,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import pagecase  # noqa: E402
 from pagecase import CSC, IDS, POWERSHELL, Bridge, compile_window, probe, strings  # noqa: E402
 from codex_auto_resume_advanced import registry  # noqa: E402
 
@@ -65,7 +66,7 @@ class LayoutTests(unittest.TestCase):
 
     def setUp(self):
         if not self.results:
-            self.fail("the probe did not run: " + (self.run_.stderr or self.run_.stdout)[-3000:])
+            self.fail(pagecase.ended(self.run_))
 
     def found(self, locale, scale, width, height):
         result = self.results.get("%s %s %dx%d" % (locale, scale, width, height))

@@ -23,6 +23,71 @@ from .usage import parse_usage
 
 # The only App Server methods the finite helper may call.
 PROTOCOL_METHODS = ("initialize", "account/rateLimits/read", "thread/queue/delete")
+# v0.6.26 (update resilience, proposal 7): what the helper last met, by method - "ok", or the AdapterError's code - with
+# a count that orders them, in this process (RESULTS) and on the backend it served (`protocol_results`): the
+# compatibility report's protocol checks read the one (compat/probes.py), the engine's usage wait the other
+# (engine/outcome.py), so a usage read Codex answered unknowably says which way it broke.
+RESULTS = {}
+_RESULTS_LOCK = threading.Lock()
+_SEQUENCE = [0]
+# The codes that mean Codex answered, and not in a way this version knows: its home or system was another, or it said
+# it does not know the method, or its usage answer is not one this version reads. A helper that did not answer at all
+# is "protocol_unavailable" or "protocol_timeout".
+#
+# An error answer is one of two (review K2): Codex saying the method is not one it knows (METHOD_UNKNOWN, `_unknown`)
+# is the method gone, which is BROKEN; any other error answer is Codex refusing a method it knows for now (REFUSED) - a
+# signed-out account, its backend failing - which says nothing of the method and is not. Both are still the
+# AdapterError "protocol_request_failed" to the caller, and both a record's usage_probe_broken_request.
+METHOD_UNKNOWN = "protocol_method_unknown"
+REFUSED = "protocol_request_refused"
+BROKEN = frozenset({"protocol_home_mismatch", "protocol_platform_mismatch", METHOD_UNKNOWN,
+                    "protocol_reply_unknown"})
+# JSON-RPC's "Method not found".
+_METHOD_NOT_FOUND = -32601
+# JSON-RPC's "Invalid request", which a Codex app server built on serde gives a method it has no variant for, naming it
+# ("Invalid request: unknown variant `<method>`, expected one of ..."). Not measured on a real Codex: it is read only
+# where it names the very method asked, so a refusal of a method it knows never reads as one gone.
+_INVALID_REQUEST = -32600
+
+
+def _unknown(error, method) -> bool:
+    """Whether Codex's error answer `error` to `method` says it does not know the method. Only the code and, for an
+    invalid request, whether the message names the method as an unknown variant, are read; the message is dropped."""
+    if not isinstance(error, dict):
+        return False
+    code, message = error.get("code"), error.get("message")
+    if type(code) is not int:
+        return False
+    if code == _METHOD_NOT_FOUND:
+        return True
+    return (code == _INVALID_REQUEST and isinstance(message, str) and "unknown variant" in message
+            and ("`%s`" % method) in message)
+
+
+def _note(backend, method, code):
+    """Keep what the helper met for `method` (RESULTS, and the backend's `protocol_results`). Never raises."""
+    with _RESULTS_LOCK:
+        _SEQUENCE[0] += 1
+        entry = (code, _SEQUENCE[0])
+        RESULTS[method] = entry
+    try:
+        kept = getattr(backend, "protocol_results", None)
+        if not isinstance(kept, dict):
+            kept = {}
+            backend.protocol_results = kept
+        kept[method] = entry
+    except Exception:
+        pass
+
+
+def last_result(method, results=None):
+    """What the helper last met for `method`, in `results` (RESULTS by default): its own call's code, or the helper's
+    start's (initialize) where that came after it - "ok", a code, or None where it has not been asked here."""
+    results = RESULTS if results is None else results
+    own, start = results.get(method), results.get("initialize")
+    if start is not None and start[0] != "ok" and (own is None or start[1] > own[1]):
+        return start[0]
+    return own[0] if own is not None else None
 # The Compatibility Registry's local-check words, which the adapter's own probes answer with.
 
 # v0.6.22: a line up to LINE_LIMIT is parsed whole. A longer one - Codex echoes a message's pictures inline, and one
@@ -146,6 +211,7 @@ class Protocol:
         self.sequence = 0
         self.responses = queue.Queue(maxsize=64)
         self.write_lock = threading.Lock()
+        self.refusal = None             # what the last error answer was (_call): METHOD_UNKNOWN or REFUSED
 
     def __enter__(self):
         self.backend._compatible()
@@ -169,8 +235,11 @@ class Protocol:
             if response.get("platformOs") != "windows":
                 raise AdapterError("protocol_platform_mismatch")
             self._write({"method": "initialized"})
+            _note(self.backend, "initialize", "ok")
             return self
-        except BaseException:
+        except BaseException as error:
+            if isinstance(error, AdapterError) and str(error).startswith("protocol_"):
+                _note(self.backend, "initialize", self._noted(error))
             self.__exit__()
             raise
 
@@ -200,6 +269,26 @@ class Protocol:
     def call(self, method, params=None):
         if method not in PROTOCOL_METHODS:
             raise AdapterError("protocol_method_not_allowed")
+        if method == "initialize":
+            return self._call(method, params)
+        try:
+            result = self._call(method, params)
+        except AdapterError as error:
+            _note(self.backend, method, self._noted(error))
+            raise
+        # A usage answer this version cannot read is Codex answering in a way it does not know (codex/usage.py).
+        unread = method == "account/rateLimits/read" and parse_usage(result).get("reason") == "usage_snapshot_unknown"
+        _note(self.backend, method, "protocol_reply_unknown" if unread else "ok")
+        return result
+
+    def _noted(self, error):
+        """What the helper met, as RESULTS keeps it: the AdapterError's code, where an error answer is METHOD_UNKNOWN or
+        REFUSED (`_unknown`)."""
+        code = str(error)
+        return (self.refusal or REFUSED) if code == "protocol_request_failed" else code
+
+    def _call(self, method, params=None):
+        self.refusal = None
         self.sequence += 1
         sequence = self.sequence
         request = {"id": sequence, "method": method}
@@ -213,6 +302,7 @@ class Protocol:
                 if response.get("id") != sequence:
                     continue
                 if "error" in response:
+                    self.refusal = METHOD_UNKNOWN if _unknown(response.get("error"), method) else REFUSED
                     raise AdapterError("protocol_request_failed")
                 return response.get("result")
         except (queue.Empty, OSError, ValueError):

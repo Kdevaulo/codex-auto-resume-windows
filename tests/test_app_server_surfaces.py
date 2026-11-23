@@ -84,7 +84,10 @@ class CommandLineTests(unittest.TestCase):
         for look in ("closed", None):
             self.look = look
             self.assertIn("not running / not paired", self.line("status"))
-            self.assertIn("not running or not paired with the configured engine", self.line("doctor"))
+        self.assertIn("not running or not paired with the configured engine", self.line("doctor"))
+        # v0.6.26 (update resilience, proposal 8): an app the look found closed is no failure of the health check.
+        self.look = "closed"
+        self.assertIn("not running (not a problem", self.line("doctor"))
 
 
 class OverlayTests(unittest.TestCase):

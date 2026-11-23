@@ -1920,7 +1920,8 @@ class SurfaceTests(ControlTestCase):
                 expected = tray.snapshot_from(store, 0.0)
         self.assertNotIn(EXTRA, drawn[0])
         self.assertEqual(drawn[1][EXTRA], {"on": 1})
-        self.assertEqual(set(drawn[0]), set(expected))
+        # v0.6.26: core's own self-check flag ("blocked", recovery cannot work here) rides beside the store's snapshot.
+        self.assertEqual(set(drawn[0]), set(expected) | {"blocked"})
 
 
 class McpSurfaceTests(ControlTestCase):

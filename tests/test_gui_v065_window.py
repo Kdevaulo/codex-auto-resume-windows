@@ -477,7 +477,12 @@ class WindowSourceTests(unittest.TestCase):
 
     def test_windows_animation_switch_is_one_input_the_window_only_reads(self):
         """Motion reads Windows' switch through Soft.WindowsAnimates, which ships as Windows' own answer and which
-        nothing in the window sets: a probe's answer there is the only other one it ever has."""
+        nothing the product runs sets: a probe's answer there is the only other one it ever has. Of the window's
+        sources exactly two lines assign it: the default in gui/SoftTheme.cs, and the picture render
+        (gui/WindowRender.cs RenderFrames, which only the generators drive, beside a capture's event), which stands
+        its own answer - Windows' animations on - only for a job whose frames carry their moment, so a motion's glides
+        are the same on any machine (v0.6.26, audit-apng M6: GitHub's runner has the switch off). The render is a
+        probe of the window in that sense; no other file and no other place may set it."""
         self.assertIn("internal static Func<bool> WindowsAnimates = WindowsAnimationEffects;", self.controls)
         reduced = self.method(self.controls, "internal static bool ReduceMotion\n")
         self.assertIn("WindowsAnimates", reduced)
@@ -486,7 +491,13 @@ class WindowSourceTests(unittest.TestCase):
         self.assertIn("SPI_GETCLIENTAREAANIMATION", asked)
         # Once in the whole window, wherever it is written: what matters is that there is one
         # place it is set, not which file that place is in.
-        self.assertEqual(guiscan.whole().count("WindowsAnimates ="), 1)
+        self.assertEqual(guiscan.whole().count("WindowsAnimates ="), 2)
+        self.assertEqual(guiscan.read("gui/SoftTheme.cs").count("WindowsAnimates ="), 1)
+        render = guiscan.read("gui/WindowRender.cs")
+        self.assertEqual(render.count("WindowsAnimates ="), 1)
+        self.assertIn('if (Clocked(Items(job, "frames"))) Soft.WindowsAnimates = delegate { return true; };',
+                      guiscan.member_body("SettingsForm", "RenderFrames"),
+                      "the render's answer only for a job with moments, in the render's own entry")
 
 
 if __name__ == "__main__":

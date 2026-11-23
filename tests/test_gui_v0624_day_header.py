@@ -22,6 +22,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,8 @@ for _path in (str(ROOT / "src"), str(ROOT / "tests")):
         sys.path.insert(0, _path)
 
 import guiscan  # noqa: E402
-from codex_auto_resume import brand, l10n  # noqa: E402
+from codex_auto_resume import brand, l10n, settings  # noqa: E402
+from test_gui_layout import fullest_snapshot  # noqa: E402
 
 CSC = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Microsoft.NET" / "Framework64" / "v4.0.30319" / "csc.exe"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -67,6 +69,28 @@ namespace CodexAutoResume
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         private static extern IntPtr DayHeaderStyle(IntPtr h, int index);
 
+        // v0.6.26 (audit Z1): every window the probe opens, and what it still waited for when its HoldStill gave up - a
+        // window opened with nothing to answer its Dashboard read waited out the whole RenderSettleLimit, 26 times.
+        private static readonly List<object> DayHeaderUnsettled = new List<object>();
+        private static int DayHeaderOpened;
+
+        // The settings the window reads, as the probe has set the window up: its theme and design, in English.
+        private static Dictionary<string, object> DayHeaderSettings;
+
+        private static SettingsForm DayHeaderOpen(RenderWriter writer)
+        {
+            var current = (Dictionary<string, object>)DayHeaderSettings["settings"];
+            current["theme"] = Palette.Dark ? "dark" : "light";
+            current["design"] = Palette.Design;
+            current["interface_language"] = "en";
+            SettingsForm form = OpenForRender(writer);
+            DayHeaderOpened++;
+            var notes = (List<string>)typeof(RenderWriter).GetField("notes", System.Reflection.BindingFlags.Instance |
+                                                                    System.Reflection.BindingFlags.NonPublic).GetValue(writer);
+            foreach (string note in notes) DayHeaderUnsettled.Add(note);
+            return form;
+        }
+
         private static List<object> DayHeaderBox(Rectangle r)
         {
             return new List<object> { (double)r.Left, (double)r.Top, (double)r.Width, (double)r.Height };
@@ -99,7 +123,7 @@ namespace CodexAutoResume
             DayArt.On = true;
             DayArt.Clock = delegate { return day; };
             var writer = new RenderWriter(Path.Combine(work, "frames-" + day.ToString("yyyyMMdd") + (headlineText == null ? "" : "-long")));
-            SettingsForm form = OpenForRender(writer);
+            SettingsForm form = DayHeaderOpen(writer);
             try
             {
                 if (headlineText != null)
@@ -168,10 +192,36 @@ namespace CodexAutoResume
                 if (Soft.OwnVisible(form.dayScene) && form.dayScene.Width > 0)
                     using (var frame = new Bitmap(form.dayScene.Width, form.dayScene.Height))
                     {
-                        form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
-                        var clock = System.Diagnostics.Stopwatch.StartNew();
-                        for (int i = 0; i < 30; i++) form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
-                        said["frameMs"] = clock.Elapsed.TotalMilliseconds / 30.0;
+                        // Against the scene alone - the frame the header drew before the band (a5cb40038: 3.8-7.4 ms
+                        // against 6.9-7.7 ms) - timed in turn in the same process, so a slow or busy runner slows both
+                        // (v0.6.26 audit Z5: a bound in milliseconds was the runner's speed as much as the frame's work).
+                        // The quickest of five turns of each: what the work takes, not what the runner let it have.
+                        // The scene alone is a control of the band's size drawn the same way (DrawToBitmap, double
+                        // buffered), in the window but hidden, and taken out again before the window's picture.
+                        var sceneAlone = new DayHeaderSceneAlone(form.dayLook, form.dayScene.Unit, form.dayScene.Size);
+                        form.Controls.Add(sceneAlone);
+                        try
+                        {
+                            form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
+                            sceneAlone.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
+                            double band = double.MaxValue, alone = double.MaxValue;
+                            for (int turn = 0; turn < 5; turn++)
+                            {
+                                var clock = System.Diagnostics.Stopwatch.StartNew();
+                                for (int i = 0; i < 10; i++) form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
+                                band = Math.Min(band, clock.Elapsed.TotalMilliseconds / 10.0);
+                                clock.Restart();
+                                for (int i = 0; i < 10; i++) sceneAlone.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
+                                alone = Math.Min(alone, clock.Elapsed.TotalMilliseconds / 10.0);
+                            }
+                            said["frameMs"] = band;
+                            said["sceneMs"] = alone;
+                        }
+                        finally
+                        {
+                            form.Controls.Remove(sceneAlone);
+                            sceneAlone.Dispose();
+                        }
                         // What a frame fills: the day's whole band, and what the close button, which paints the day under it
                         // each frame, fills of it - only what lies under it.
                         DayArt.Filled = 0;
@@ -191,6 +241,36 @@ namespace CodexAutoResume
             {
                 form.Dispose();
                 DayArt.On = false;
+            }
+        }
+
+        // The day's scene alone on its ground, where the header's band stands, as the header drew a frame of the day before
+        // the band (W2): the reference a frame of the band is held against.
+        private sealed class DayHeaderSceneAlone : Control
+        {
+            private readonly string look;
+            private readonly double u;
+
+            internal DayHeaderSceneAlone(string look, double u, Size size)
+            {
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+                this.look = look;
+                this.u = u;
+                Size = size;
+                Visible = false;
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                Graphics g = e.Graphics;
+                string name, top, bottom;
+                Brand.DayGround(look, out name, out top, out bottom);
+                g.Clear(ColorTranslator.FromHtml(name));
+                double width = Width, origin = Brand.DayFromTop(look) ? 0.0 : Height - Brand.DaySceneHeight * u;
+                DayArt.Draw(g, DayArt.Parse(Brand.DayScene(look)), 0.0, u, delegate(double x, double y)
+                {
+                    return new PointF((float)(width - (Brand.DaySceneWidth - x) * u), (float)(origin + y * u));
+                });
             }
         }
 
@@ -236,7 +316,7 @@ namespace CodexAutoResume
             DayArt.On = true;
             DayArt.Clock = delegate { return now; };
             var writer = new RenderWriter(Path.Combine(work, "frames-follow-" + from.ToString("yyyyMMdd")));
-            SettingsForm form = OpenForRender(writer);
+            SettingsForm form = DayHeaderOpen(writer);
             try
             {
                 form.FollowDayScene();
@@ -333,7 +413,12 @@ namespace CodexAutoResume
             AdoptTextSize(1.0, 1.0);
             Soft.StillLightMs = 0;
             var strings = Json.Parse(File.ReadAllText(Path.Combine(work, "strings-en.json"), new UTF8Encoding(false)));
-            renderAnswers = new List<object> { new Dictionary<string, object> { { "command", "strings" }, { "reply", strings } } };
+            DayHeaderSettings = (Dictionary<string, object>)Json.Parse(File.ReadAllText(Path.Combine(work, "settings.json"), new UTF8Encoding(false)));
+            var dashboard = Json.Parse(File.ReadAllText(Path.Combine(work, "dashboard.json"), new UTF8Encoding(false)));
+            renderAnswers = new List<object> { new Dictionary<string, object> { { "command", "strings" }, { "reply", strings } },
+                                               new Dictionary<string, object> { { "command", "dashboard" }, { "reply", dashboard } },
+                                               new Dictionary<string, object> { { "command", "describe" }, { "reply", Json.Parse(File.ReadAllText(Path.Combine(work, "describe.json"), new UTF8Encoding(false))) } },
+                                               new Dictionary<string, object> { { "command", "settings" }, { "reply", DayHeaderSettings } } };
             PersistentBridge.Answers = RenderAnswer;
             DateTime special = DateTime.MinValue, plain = DateTime.MinValue;
             string look, top, bottom;
@@ -365,7 +450,7 @@ namespace CodexAutoResume
                         DateTime noon = day.AddHours(12);
                         DayArt.On = true;
                         DayArt.Clock = delegate { return noon; };
-                        SettingsForm form = OpenForRender(new RenderWriter(Path.Combine(work, "frames-words-" + design + "-" + theme)));
+                        SettingsForm form = DayHeaderOpen(new RenderWriter(Path.Combine(work, "frames-words-" + design + "-" + theme)));
                         try
                         {
                             words2[key] = new Dictionary<string, object> { { "look", form.dayLook }, { "words", DayHeaderGroundWords(form) },
@@ -382,6 +467,8 @@ namespace CodexAutoResume
                         }
                     }
             said["groundWords"] = words2;
+            said["opened"] = (double)DayHeaderOpened;
+            said["unsettled"] = DayHeaderUnsettled;
             Palette.AdoptDesign(null);
             Palette.Adopt("light");
             PersistentBridge.Answers = null;
@@ -412,6 +499,13 @@ def expected_share(canvas, day, words, tint):
         share -= 0.005
     return 0.0
 
+# How much more than the scene alone a frame of the band may cost, each the quickest of five turns of ten DrawToBitmaps in
+# one process: 1.2 here (4.2 ms against 3.5 ms at 150 %); the band was made to cost about what the scene had (a5cb40038).
+# A band that painted itself three times over measured 2.5 (7.0 ms against 2.8) - under the 12 ms the test held until
+# v0.6.26, which a loaded runner could break with no more work done (audit Z5).
+FRAME_OVER_SCENE = 2.0
+
+
 @unittest.skipUnless(CSC.is_file(), "needs the in-box C# compiler")
 class DayHeaderTests(unittest.TestCase):
     @classmethod
@@ -421,6 +515,13 @@ class DayHeaderTests(unittest.TestCase):
         reply = {"ok": True, "language": "en", "strings": l10n.catalog("en"), "endonyms": dict(l10n.ENDONYMS),
                  "preference": "en", "system_language": "en"}
         (work / "strings-en.json").write_text(json.dumps(reply, ensure_ascii=False), encoding="utf-8")
+        # The Dashboard's reads answered - its settings, its schema and the dashboard - as the pictures' renders answer
+        # them: each window holds still once drawn from them, instead of waiting out the render's whole settle limit for a reply that never came (audit Z1).
+        (work / "dashboard.json").write_text(json.dumps(fullest_snapshot(time.time()), ensure_ascii=False), encoding="utf-8")
+        (work / "describe.json").write_text(json.dumps({"ok": True, "schema": settings.describe()}, ensure_ascii=False),
+                                            encoding="utf-8")
+        (work / "settings.json").write_text(json.dumps({"ok": True, "settings": settings.defaults()}, ensure_ascii=False),
+                                            encoding="utf-8")
         probe = work / "DayHeaderProbe.cs"
         probe.write_text(PROBE, encoding="utf-8")
         exe = work / "DayHeader.exe"
@@ -448,6 +549,13 @@ class DayHeaderTests(unittest.TestCase):
     def setUp(self):
         if self.failure:
             self.fail(self.failure)
+
+    def test_every_window_the_probe_opens_holds_still(self):
+        """Each window is drawn from every answer it asked for before it is looked at (OpenForRender's HoldStill): one that
+        gave up waiting said so only in its writer's notes, never read, and cost the render's whole 20 s settle limit -
+        26 windows, 520 of the module's 526 s in every lane (v0.6.26 audit Z1)."""
+        self.assertEqual(self.answer["opened"], 6 + 2 * 2 * len(brand.DAY_LOOKS))
+        self.assertEqual(self.answer["unsettled"], [])
 
     def test_the_probe_s_date_gives_the_window_a_look_and_an_ordinary_day_none(self):
         room = self.answer["room"]
@@ -536,7 +644,10 @@ class DayHeaderTests(unittest.TestCase):
         self.assertLess(special["buttonFilled"], special["sceneFilled"] / 3, special)
 
     def test_w2_a_frame_of_the_band_costs_little(self):
-        self.assertLess(self.answer["room"]["special"]["frameMs"], 12.0)
+        """About what a frame of the scene alone costs, timed beside it in the same process (audit Z5): never a number of
+        milliseconds, which a loaded runner breaks without the frame doing any more."""
+        special = self.answer["room"]["special"]
+        self.assertLess(special["frameMs"], FRAME_OVER_SCENE * special["sceneMs"], special)
 
     def test_with_no_room_there_is_no_scene_and_no_slice_of_it(self):
         no_room = self.answer["noRoom"]

@@ -9,6 +9,7 @@ import time
 
 from .. import config
 from .. import compat
+from ..codex import appserver
 from .files import (path_digest)
 from .cache import (_coerce, _columns, _newest)
 
@@ -27,6 +28,7 @@ def source_checks(source) -> dict:
             return checks
     except (AttributeError, TypeError, OSError, ValueError):
         return checks
+    threads = False
     for kind, check in (("state", "state_schema"), ("history", "history_schema"),
                         ("queue", "queue_schema")):
         connection = None
@@ -38,6 +40,14 @@ def source_checks(source) -> dict:
             missing = any(not required <= _columns(connection, table)
                           for table, required in tables.items())
             checks[check] = compat.FAIL if missing else compat.PASS
+            if kind == "state" and not missing:
+                # Whether the newest state database holds a conversation - a home that has one has opened it, so its
+                # lock folder is expected (below). Only whether a row exists is read, never a column of one; a read
+                # that fails leaves it "none", the check as it always was.
+                try:
+                    threads = connection.execute("SELECT 1 FROM threads LIMIT 1").fetchone() is not None
+                except Exception:
+                    threads = False
             if kind == "history":
                 found = connection.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' "
@@ -60,20 +70,36 @@ def source_checks(source) -> dict:
         try:
             # Absent is not a failure: a Codex that has never opened a conversation has
             # neither. It only means the capability cannot be established yet.
-            checks[name] = compat.PASS if (home / directory).is_dir() else compat.NOT_APPLICABLE
+            # v0.6.26 (update resilience #4): but a home whose newest state database holds a conversation and keeps no
+            # lock folder is one where Codex moved, renamed or dropped it, and whether a conversation is open can no
+            # longer be read there (codex/transport.py loaded answers unknown): a FAIL, not "not yet".
+            there = (home / directory).is_dir()
+            checks[name] = (compat.PASS if there else
+                            compat.FAIL if name == "lock_directory" and threads else compat.NOT_APPLICABLE)
         except OSError:
             checks[name] = compat.UNAVAILABLE
     return checks
+
+
+def protocol_check(method) -> str:
+    """v0.6.26 (update resilience, proposal 7): what Codex's helper last met for `method` in this process
+    (codex/appserver.py last_result), where it has been asked: FAIL where Codex answered in a way this version does
+    not know or said it does not know the method (appserver.BROKEN), PASS where it answered - a refusal of a method it
+    knows (appserver.REFUSED: a signed-out account, its backend failing) included, which says nothing of the method
+    and must not fail what stands on it (review K2). Where it has not been asked here yet - a reader of its own, a
+    watcher that has had no usage to read - or did not answer at all, the method this product may ask is a PASS as it
+    always was, and one it may not ask a FAIL: a report says no less than it said before."""
+    if method not in appserver.PROTOCOL_METHODS:
+        return compat.FAIL
+    return compat.FAIL if appserver.last_result(method) in appserver.BROKEN else compat.PASS
 
 
 def api_checks() -> dict:
     from .. import windows
     return {
         "restart_manager": compat.PASS if windows.restart_manager_available() else compat.UNAVAILABLE,
-        "protocol_usage_method": (compat.PASS if "account/rateLimits/read" in windows.PROTOCOL_METHODS
-                                  else compat.FAIL),
-        "protocol_delete_method": (compat.PASS if "thread/queue/delete" in windows.PROTOCOL_METHODS
-                                   else compat.FAIL),
+        "protocol_usage_method": protocol_check("account/rateLimits/read"),
+        "protocol_delete_method": protocol_check("thread/queue/delete"),
     }
 
 

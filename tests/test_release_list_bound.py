@@ -1,5 +1,6 @@
-"""The bound on the list of releases the update check and the version picker read (v0.6.23, the owner's decision of
-2026-11-10): 8 MiB, written once, and said the same wherever a person reads it.
+"""The bound on the list of releases the update check and the version picker read: 32 MiB since v0.6.26 (the owner,
+2026-11-23; 8 MiB from v0.6.23, the owner's decision of 2026-11-10), written once, and said the same wherever a person
+reads it. Why 32 MiB - above the largest page GitHub can send - is tests/test_release_pages_large.py's.
 
 Nothing here reaches the network: how near the real list stands to the bound is the release's own check. What a list
 over the bound does is held by test_prerelease_offer and test_version_picker, which take the value from the script.
@@ -22,9 +23,9 @@ class BoundTests(unittest.TestCase):
     def setUpClass(cls):
         cls.script = BOOTSTRAP.read_text(encoding="utf-8")
 
-    def test_the_bound_is_eight_mib(self):
+    def test_the_bound_is_thirty_two_mib(self):
         found = re.findall(r"(?m)^\$ReleasesMaxChars = (\d+)\s*$", self.script)
-        self.assertEqual(found, [str(8 * MIB)], "one assignment, of 8 MiB")
+        self.assertEqual(found, [str(32 * MIB)], "one assignment, of 32 MiB")
 
     def test_the_comment_says_what_an_installed_copy_keeps(self):
         before = self.script[:self.script.index("$ReleasesMaxChars = ")].splitlines()[-3:]
@@ -44,7 +45,7 @@ class BoundTests(unittest.TestCase):
     @unittest.skipIf(languages.generated_ko_branch(), "the generated ko branch's SECURITY.md is the Korean one")
     def test_a_person_reads_the_same_number(self):
         security = (ROOT / "docs" / "SECURITY.md").read_text(encoding="utf-8")
-        self.assertIn("is over 8 MiB, is not a list", security)
+        self.assertIn("is over 32 MiB, is not a list", security)
 
 
 if __name__ == "__main__":
