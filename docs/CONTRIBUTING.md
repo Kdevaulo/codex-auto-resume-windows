@@ -76,8 +76,10 @@ It sets `PYTHONPATH` and `CODEX_AR_EDITION` for the lane itself - `standard`, `a
 `release` (the two suites the release runs before it builds) - gives each part of a parallel run its
 own `TEMP` and `TMP`, and starts every child with no console window. Parallel parts share the machine,
 so the speed-up is what your processor has to spare. The window tests
-contend for one desktop, and the longest file - `tests/test_gui_layout.py`, which lays out every page
-in every language at five scalings - is a floor no number of parts goes below.
+contend for one desktop. The window's layout audit, which lays out every page in every language at five
+scalings, is dealt by language over four modules - `tests/test_gui_layout.py` audits the first share and
+`tests/test_gui_layout_audit_2.py` to `_4.py` the other three - because the runner deals whole files and one
+file holding all 22 languages was a floor no number of parts went below; the longest of them still is.
 
 The parts together are exactly the tests `unittest discover` finds, each once, for every part count
 the workflows use: `tests/test_split_runs.py` proves it. Whether a part's results are a whole run's
