@@ -214,13 +214,21 @@ class UsageStop(UsagePause):
                 self._notice("press_resume", window)
         return None
 
+    def _continue_on(self) -> bool:
+        """Whether Continue after the reset (the wrap-up's choice) is on; off where it cannot be read."""
+        try:
+            return self._scoped.options_of(WRAP_UP).get(OptionKey.WRAP_AFTER_RESET, ON) == ON
+        except Exception:
+            return False
+
     def _remember(self, thread, turn, window) -> bool:
-        """A conversation it stopped, kept for one continuation after its window resets - where Continue after the
-        reset (the wrap-up's choice) is on. Whether one is kept."""
+        """A conversation it stopped, kept for one turn after its window resets: its continuation where Continue after
+        the reset (the wrap-up's choice) is on. Kept with it off too (review4 V4, the owner's answer of 2026-11-23): a
+        reset message of that conversation is then still carried by the stop's own turn, never queued into the paused
+        queue, and without one nothing goes (`after_reset`). Whether a continuation will go."""
         scoped = self._scoped
         try:
-            if scoped.options_of(WRAP_UP).get(OptionKey.WRAP_AFTER_RESET, ON) != ON:
-                return False
+            going = self._continue_on()
             words = statement.CATALOGS.text(AFTER_RESET_KEY, self._locale())
             if not words_pass(words):
                 return False
@@ -229,7 +237,7 @@ class UsageStop(UsagePause):
             if scoped.continuations.get(key) is None:
                 scoped.continuations.add(key, ContinuationKind.AFTER_RESET, thread, words, ordinal=turn.ordinal,
                                          chain=window["minutes"])
-            return True
+            return going
         except Exception:
             return False
 
@@ -260,6 +268,7 @@ class UsageStop(UsagePause):
             return
         now, rows = scoped.now(), scoped.meter.rows()
         turns, source, start = Turns(self._codex_home()), self._source(), self._start or ipc.start_turn
+        going = self._continue_on()
         for row in waiting:
             if not _reset_since(rows, row["chain"], row["created_at"], now):
                 continue
@@ -312,6 +321,11 @@ class UsageStop(UsagePause):
                         self._count("resume_unproven")
                 continue
             if latest.status not in FINAL or found[0] == QUEUED:
+                continue
+            if found[0] == CONTINUE and not going:
+                # review4 V4: Continue after the reset off - nothing of the product's own goes. This waits with the
+                # paused queue, so a reset message of the conversation falling due later is still carried by this turn
+                # at its due time, and lets that queue go; newer work (the person's Resume) ends it.
                 continue
             failures, again = self._backoff.get(row["record_id"], (0, 0))
             if now < again:
