@@ -212,8 +212,8 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   building its dialog starts nothing, so the window audit never asks GitHub. It reads the whole list
   of releases from a second api.github.com address on the same path - thirty to a page, at most twenty
   pages, ending at the first page that is short or that reaches below v0.6.2, the page number the one
-  thing put in, each page under the same size, redirect and host checks and a deadline of 20 seconds
-  inside one budget of 400 seconds - and any page that fails lists nothing, as does a twentieth
+  thing put in, each page under the same size, redirect and host checks and a deadline of 60 seconds,
+  or what is left of one budget of 400 seconds if that is less, the budget alone bounding the run - and any page that fails lists nothing, as does a twentieth
   page as full as the rest, which more may follow. A picked version
   never reaches a URL as typed: it is rebuilt from its integers by the version rule, the row must
   still be offered exactly as it was shown when the list is read again, and `-Force` is required for
