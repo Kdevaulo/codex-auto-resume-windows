@@ -82,7 +82,7 @@ def carried_by_stop(rule, stops) -> bool:
     return any(stop.get("capability") == PAUSE and stop.get("kind") == ContinuationKind.AFTER_RESET
                and stop.get("thread_id") == rule.get("thread_id")
                and stop.get("finished_at") is None and stop.get("record_state") == RecordState.WAITING
-               and stop.get("words") and isinstance(stop.get("created_at"), (int, float))
+               and isinstance(stop.get("created_at"), (int, float))
                and due >= stop["created_at"] for stop in stops)
 
 
@@ -329,7 +329,7 @@ class ResetMessage:
         except Exception:
             return False
         if armed and any(stop.get("finished_at") is None and stop.get("record_state") == RecordState.WAITING
-                         and stop.get("words") for stop in stops):
+                         for stop in stops):
             return True
         since = due if due is not None else rule["created_at"]
         return any(isinstance(stop.get("finished_at"), (int, float)) and stop["finished_at"] >= since

@@ -598,9 +598,9 @@ class ResetsHandle:
             # of it is (runtime._record_moved).
             "carry_message": writing(state.carry_message),
             "carried_message": writing(lambda rule_id, started: carried(rule_id, started)),
-            # review4 V2: a message the stop's turn would carry, in a conversation that is archived or gone - ended as
-            # one not started, in reset_message's own word.
-            "message_not_started": writing(lambda rule_id: gone_uncarried(rule_id)),
+            # review4 V2, review6 A3: a message the stop's turn would carry, in a conversation archived or gone for a
+            # day since it could go - ended as reset_message ends one that waited too long, in its own word.
+            "message_expired": writing(lambda rule_id: gone_uncarried(rule_id)),
         }
 
         def gone_uncarried(rule_id):
@@ -608,10 +608,10 @@ class ResetsHandle:
             if (rule is None or rule["capability"] != MESSAGE or rule["state"] != RuleState.READY
                     or rule["record_state"] != RecordState.WAITING):
                 return False
-            done = state.end_rule(rule_id, RuleState.DONE, RuleReason.NOT_STARTED)
+            done = state.end_rule(rule_id, RuleState.DONE, RuleReason.EXPIRED)
             if done:
                 try:
-                    state.counted(MESSAGE, "not_started")
+                    state.counted(MESSAGE, "expired")
                 except StateError:
                     pass
             return done
