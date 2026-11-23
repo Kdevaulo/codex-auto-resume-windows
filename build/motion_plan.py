@@ -10,7 +10,7 @@ A plan is JSON:
 
     {"format": "car-motion/1", "name": "readme-en", "output": "docs/images/readme-motion.png",
      "scenes_from": "readme-scenes.json", "values": {"first": "en", "second": "ko"},
-     "light_step_ms": 33, "length": [25000, 35000], "budget": {"cap": 9000000},
+     "light_step_ms": 33, "length": [25000, 35000], "budget": {"cap": 12000000},
      ...the canvas, the window, the taskbar and the card (make_motion.py reads those)...}
 
 `scenes` (or the file `scenes_from` names, beside it) is a list of {"id", "steps"}. A `${name}` anywhere in the scenes

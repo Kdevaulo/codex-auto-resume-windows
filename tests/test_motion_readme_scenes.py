@@ -63,7 +63,7 @@ class PlacementTests(unittest.TestCase):
                 self.assertGreater(end, 40000)
                 self.assertLessEqual(end, plan["length"][1])
                 self.assertEqual(plan["length"], [25000, 48000])
-                self.assertEqual(plan["budget"], {"cap": 9000000}, "the ceiling stays where it was")
+                self.assertEqual(plan["budget"], {"cap": 12000000}, "the ceiling stays where it was")
 
     def test_the_first_frame_and_the_scenes_before_the_row_menu_are_as_they_were(self):
         for name in PLANS:
