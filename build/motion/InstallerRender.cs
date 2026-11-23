@@ -62,6 +62,9 @@ namespace CodexAutoResume
                                                    InstallerFlow.Finish };
         // The longest one step of the window may take to be shown, in milliseconds.
         private const int StepLimit = 10000;
+        // v0.6.26 (fourth-round audit F2): the window's font size in a render whose scale the job pinned - Windows' own
+        // default for its message font, 9 points - whatever this machine's is (gui/WindowRender.cs RenderPoints).
+        private const float RenderPoints = 9f;
 
         [STAThread]
         private static int Main(string[] arguments)
@@ -158,6 +161,9 @@ namespace CodexAutoResume
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 Soft.ReduceMotionSetting = false;
+                // v0.6.26 (fourth-round audit F2): never in High Contrast, whatever this machine says, as gui/WindowRender.cs
+                // renders: the same picture on any machine, every glide drawn (Soft.ReduceMotion).
+                Theme.HighContrastOn = delegate { return false; };
                 Palette.AdoptDesign(design);
                 Palette.Adopt(Theme.Current(theme));
                 Font font;
@@ -176,10 +182,12 @@ namespace CodexAutoResume
                     // Windows this machine is - the window sets each language in its own Windows' face from it
                     // (Typeface.ForLanguage), as the product does. Before, the English picture made on a Korean Windows
                     // kept Malgun Gothic, which draws every backslash of its log as a won sign.
-                    Font box = SystemFonts.MessageBoxFont;
-                    font = new Font(Typeface.Segoe, box.SizeInPoints * SettingsForm.FontFactor, box.Style, GraphicsUnit.Point);
+                    // v0.6.26 (fourth-round audit F2): at Windows' default size and style too (RenderPoints, regular), not this
+                    // machine's message font's.
+                    font = new Font(Typeface.Segoe, RenderPoints * SettingsForm.FontFactor, FontStyle.Regular, GraphicsUnit.Point);
                     if (!string.Equals(font.FontFamily.Name, Typeface.Segoe, StringComparison.OrdinalIgnoreCase))
-                        font = new Font(box.FontFamily, box.SizeInPoints * SettingsForm.FontFactor, box.Style, GraphicsUnit.Point);
+                        font = new Font(SystemFonts.MessageBoxFont.FontFamily, RenderPoints * SettingsForm.FontFactor, FontStyle.Regular,
+                                        GraphicsUnit.Point);
                 }
                 else
                 {
