@@ -91,7 +91,8 @@ class PopupFrames:
             for row in key[1]:
                 model.begin(model.action_for(("check", tasks[row - 1])))
                 vm = model.view(now)
-            self._views[key] = (vm, self.renderer.layout(vm, self.scale, self.locale), tasks)
+            with shots.pinned_face():           # the stills' face (make_screenshots.pinned_face, F1)
+                self._views[key] = (vm, self.renderer.layout(vm, self.scale, self.locale), tasks)
         vm, plan, _tasks = self._views[key]
         return vm, plan
 
@@ -186,14 +187,15 @@ class PopupFrames:
         light = self.tray.halo(vm["light"], moment, moment, design=self.design)
         hover = self.hovered(pointer, self.opening(frame)[1])
         faces = self.faces(plan, hover, frame.t)
-        if gliding or hover is not None or faces:
-            self.renderer.draw(vm, plan, frame=light, glides=gliding, hover=hover, faces=faces)
-            self._held = None
-        elif self._held == key:
-            self.renderer.draw_halo(plan, light)
-        else:
-            self.renderer.draw(vm, plan, frame=light)
-            self._held = key
+        with self.shots.pinned_face():
+            if gliding or hover is not None or faces:
+                self.renderer.draw(vm, plan, frame=light, glides=gliding, hover=hover, faces=faces)
+                self._held = None
+            elif self._held == key:
+                self.renderer.draw_halo(plan, light)
+            else:
+                self.renderer.draw(vm, plan, frame=light)
+                self._held = key
         _w, _h, bgra = self.shots.popup_picture(self.renderer, plan, self.pad, self.theme, self.design)
         return self.shots.clear_rgba(bgra)
 
