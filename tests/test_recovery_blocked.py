@@ -205,7 +205,8 @@ class FeederTests(unittest.TestCase):
 
     def test_an_error_code_codex_reports_that_this_version_does_not_know_is_named_with_its_count(self):
         # #10: three conversations whose latest turns failed with a tag outside CODES, one with a known kind; only the
-        # shape is read, and the newest code is the one named.
+        # shape is read, and the newest code is the one named, counted alone (review R4, B9 "that code ... and how
+        # many in the last day": olderNewThing is not counted under it).
         tagged = {"form": "tagged", "code": "somethingNewExceeded", "status": None, "has_message": True}
         self.failed_turns = [{"category": "unknown", "completed_at": 900.0, "shape": dict(tagged, code="olderNewThing")},
                              {"category": "unknown", "completed_at": 950.0, "shape": tagged},
@@ -215,7 +216,7 @@ class FeederTests(unittest.TestCase):
                               "shape": {"form": "message_only", "code": None, "status": None, "has_message": True}}]
         self.run_for(1)
         check = public.self_check(self.written(), 500.0)
-        self.assertEqual(check["unknown_error"], {"code": "somethingNewExceeded", "count": 2})
+        self.assertEqual(check["unknown_error"], {"code": "somethingNewExceeded", "count": 1})
         self.assertIsNone(check["blocked"])
 
     def kept_layout(self, **kept):
