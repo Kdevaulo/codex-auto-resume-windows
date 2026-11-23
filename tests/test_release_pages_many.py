@@ -138,7 +138,10 @@ class ManyReleasesTests(unittest.TestCase):
         self.assertEqual((c["PickPageSize"], c["PickMaxPages"]), (SIZE, 20))
         self.assertGreaterEqual(c["PickPageSize"] * c["PickMaxPages"] - len(BELOW), 500,
                                 "at least 500 releases above the floor list in full")
-        self.assertLessEqual(c["PickMaxPages"] * c["PickPageTimeoutMax"], c["PickBudgetSeconds"])
+        # Bounded by the budget alone since the owner gave each page 60 s (2026-11-23, audit4 F5): twenty pages of 60 s
+        # are more than the budget, and a run that gets there ends by the budget (test_release_pages_budget).
+        self.assertEqual(c["PickPageTimeoutMax"], 60)
+        self.assertLessEqual(c["PickPageTimeoutMax"], c["PickBudgetSeconds"])
         source = (ROOT / "gui" / "DashboardVersions.cs").read_text(encoding="utf-8")
         waits = re.findall(r"private const int ListMilliseconds = (\d+);", source)
         self.assertEqual(len(waits), 1)

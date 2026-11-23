@@ -346,14 +346,17 @@ $AdvancedMarkSince = '0.6.17'
 # $PickMaxPages of them - a page with fewer ends it, and so does a full one whose last release is older
 # than $PickFloor, since the list is newest first and nothing past it is ever offered; a full last one
 # that ends neither way is no answer - and all of it within $PickBudgetSeconds, each page within
-# $PickPageTimeoutMax. The window waits longer than that for the answer. Twenty pages are 600
+# $PickPageTimeoutMax or what is left of the budget, whichever is less. The run is bounded by the budget
+# alone, not by pages times a page's limit (the owner, 2026-11-23, audit4 F5: 60 s a page, as a slow
+# network needs - 0.8 MB in 60 s is about 14 KB/s - where 20 s asked for about 40 KB/s; today three
+# pages are read). The window waits longer than the budget for the answer. Twenty pages are 600
 # published releases (v0.6.26; it was five, 150, and the 150th would have come around March 2027),
 # so about 590 above the floor list in full - some years at the pace since v0.5.0. Thirty to a page
 # is the page STANDARDS.md C3 names; a page of thirty of today's notes is about a fortieth of $ReleasesMaxChars.
 $PickPageSize = 30
 $PickMaxPages = 20
 $PickBudgetSeconds = 400
-$PickPageTimeoutMax = 20
+$PickPageTimeoutMax = 60
 # I12 as the owner amended it on 2026-10-03: its two pre-release clauses bind the update check's offer,
 # and a version picked by name and confirmed - a pre-release too, older or newer - follows "older only
 # with -Force", the confirmation being the yes. Both $false is I12 as it was written before: a
