@@ -50,9 +50,9 @@ def tags() -> list:
 def legacy(tag) -> types.ModuleType:
     """The tag's engine/usagestop.py, loaded as a module of this package (its relative imports resolve here)."""
     name = "codex_auto_resume_advanced.engine._legacy_usagestop_" + tag.replace(".", "_").replace("-", "_")
+    # The spec's parent, taken from the name, is the package its relative imports resolve in (module_from_spec sets it).
     spec = importlib.util.spec_from_loader(name, loader=None)
     module = importlib.util.module_from_spec(spec)
-    module.__package__ = "codex_auto_resume_advanced.engine"
     exec(compile(_git("show", "%s:%s" % (tag, SOURCE)).decode("utf-8"), "%s:%s" % (tag, SOURCE), "exec"),
          module.__dict__)
     return module
