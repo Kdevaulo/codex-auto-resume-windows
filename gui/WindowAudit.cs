@@ -203,6 +203,9 @@ namespace CodexAutoResume
                             form.Audit("diagnostics with a watcher stopped (" + ended + ")", findings);
                             form.FollowWatcher(true);
                         }
+                        // v0.6.26 (fourth-round design lead): and Codex changed - the watcher's own judge saying the most it
+                        // says (WithCodexChanged): the Right now line, the Pending rows' overlay and Diagnostics' callout.
+                        form.AuditCodexChanged(snapshot, findings);
                         form.ApplySnapshot(snapshot);
                         form.AuditTimeline(snapshot, findings);
                         // v0.6.11: and the Log dialog's list, built with lines as long as the log writes them, and the
@@ -1817,6 +1820,173 @@ namespace CodexAutoResume
             status["watcher_running"] = false;
             stopped["status"] = status;
             return stopped;
+        }
+
+        /// How many pages the last LayoutAudit laid out with Codex changed (AuditCodexChanged), so that a quiet report is
+        /// known to have looked at its words: the Overview, Pending and Diagnostics.
+        internal static int AuditedCodexChanged;
+
+        /// v0.6.26 (fourth-round design lead): the pages whose words say Codex changed - the Right now line
+        /// (overlay.codex_changed, the longest of its words in most languages: de 76 characters), the Pending rows'
+        /// overlay and Diagnostics' callout of up to four lines (CodexNote) - laid out from a reply whose watcher's judge
+        /// says the most it says (WithCodexChanged), each audited as every page is.
+        ///
+        /// Two of them a page's own walk cannot judge, so they are measured here: the header's facts end in an ellipsis
+        /// by design (AutoEllipsis), and these must be said whole - a person who reads only "Codex changed; recovery..."
+        /// is not told why nothing is recovered; and the callout is a label held to a width, which clips a word longer than
+        /// that width without growing (Fits measures it within its MaximumSize).
+        private void AuditCodexChanged(Dictionary<string, object> snapshot, List<string> findings)
+        {
+            AuditedCodexChanged = 0;
+            ApplySnapshot(WithCodexChanged(snapshot));
+            foreach (string page in new[] { "overview", "pending", "diagnostics" })
+            {
+                ShowPage(page);
+                string where = page + " with Codex changed";
+                Audit(where, findings);
+                if (page == "overview")
+                {
+                    AuditRows(where, true, findings);
+                    AuditNames(where, findings);
+                    AuditHero(where, findings);
+                    string word = S("overlay.codex_changed", "Codex changed; recovery cannot work here");
+                    string facts = heroDetail ?? "";
+                    int needs = TextRenderer.MeasureText(facts, detail.Font, new Size(int.MaxValue, int.MaxValue),
+                                                         TextFormatFlags.SingleLine).Width;
+                    if (facts.IndexOf(word, StringComparison.Ordinal) < 0)
+                        findings.Add(where + "/header :: its facts do not say " + word);
+                    else if (needs > detail.ClientSize.Width)
+                        findings.Add(where + "/header :: its facts end in an ellipsis, needing " + needs + " wide, with " +
+                                     detail.ClientSize.Width);
+                }
+                if (page == "pending") AuditLists(where, findings);
+                if (page == "diagnostics")
+                {
+                    string note = diagCodexNote.Text ?? "";
+                    if (note.Length == 0 || !OwnVisible(diagCodexNote))
+                        findings.Add(where + "/" + AuditName(diagCodexNote) + " :: says nothing");
+                    foreach (string piece in Unbroken(note))
+                    {
+                        int wide = TextRenderer.MeasureText(piece, diagCodexNote.Font, new Size(int.MaxValue, int.MaxValue),
+                                                            TextFormatFlags.SingleLine).Width;
+                        if (wide > diagCodexNote.ClientSize.Width)
+                        {
+                            findings.Add(where + "/" + AuditName(diagCodexNote) + " :: a word needs " + wide + " wide, has " +
+                                         diagCodexNote.ClientSize.Width);
+                            break;
+                        }
+                    }
+                }
+                AuditedCodexChanged++;
+            }
+        }
+
+        /// The runs of `text` a line cannot break inside: between spaces and line ends, and never across a character of a
+        /// script written without spaces between its words (CJK, kana, full-width forms, Thai), where Windows breaks a line
+        /// at any character or by its own dictionary.
+        internal static List<string> Unbroken(string text)
+        {
+            var runs = new List<string>();
+            var run = new StringBuilder();
+            foreach (char c in text ?? "")
+            {
+                bool space = c == ' ' || c == '\r' || c == '\n';
+                bool unspaced = (c >= '฀' && c <= '๿') || (c >= '　' && c <= '鿿') ||
+                                (c >= '豈' && c <= '﫿') || (c >= '＀' && c <= '￯');
+                if (space || unspaced)
+                {
+                    if (run.Length > 0) runs.Add(run.ToString());
+                    run.Length = 0;
+                    if (unspaced) runs.Add(c.ToString());
+                }
+                else run.Append(c);
+            }
+            if (run.Length > 0) runs.Add(run.ToString());
+            return runs;
+        }
+
+        /// The same pages with Codex changed alone, for tests/test_gui_layout_codex_changed.py: the window built as
+        /// LayoutAudit builds it, at `scale`, in `stringsJson`'s language, from `snapshotJson`, and nothing else laid out.
+        internal static string CodexChangedAudit(string stringsJson, string snapshotJson, double scale)
+        {
+            var findings = new List<string>();
+            AuditedCodexChanged = 0;
+            System.Reflection.FieldInfo fallback = typeof(Control).GetField("defaultFont",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Font defaultBefore = Control.DefaultFont;
+            Font baseBefore = Soft.BaseFont;
+            try
+            {
+                dpiScale = scale;
+                float factor = (float)(scale / SystemScale);
+                Font box = SystemFonts.MessageBoxFont;
+                var windowFont = new Font(box.FontFamily, box.SizeInPoints * factor, box.Style, GraphicsUnit.Point);
+                if (fallback != null)
+                    fallback.SetValue(null, new Font(defaultBefore.FontFamily, defaultBefore.SizeInPoints * factor,
+                                                     defaultBefore.Style, GraphicsUnit.Point));
+                var catalog = Json.Parse(stringsJson) as Dictionary<string, object>;
+                var snapshot = Json.Parse(snapshotJson) as Dictionary<string, object>;
+                string nowhere = Path.Combine(Path.GetTempPath(), "codex-auto-resume-layout-audit-" + Guid.NewGuid().ToString("N"));
+                using (var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), catalog, windowFont))
+                {
+                    form.auditing = true;
+                    form.TopLevel = false;
+                    form.MinimumSize = Size.Empty;
+                    form.ClientSize = form.OpeningClient;
+                    if (snapshot != null) form.AuditCodexChanged(snapshot, findings);
+                }
+            }
+            finally
+            {
+                dpiScale = SystemScale;
+                if (fallback != null) fallback.SetValue(null, defaultBefore);
+                Soft.BaseFont = baseBefore;
+            }
+            return string.Join("\n", findings.ToArray());
+        }
+
+        /// The reply with the watcher's own judge (domain/public.py self_check) at its fullest: the rule whose words are
+        /// the longest in this language, an error code longer than any Codex has named (failures.py's longest is 30
+        /// letters) seen a million times less one, and the two versions at the longest the judge names one (VERSION_MAX) -
+        /// and every waiting record held for it (the overlay).
+        private Dictionary<string, object> WithCodexChanged(Dictionary<string, object> reply)
+        {
+            string longest = null;
+            int widest = -1;
+            foreach (string word in new[] { "recovery_blocked:held_elsewhere", "recovery_blocked:locks_unread",
+                                            "recovery_blocked:stale_database", "recovery_blocked:usage_protocol",
+                                            "detection_blocked:history_unreadable", "detection_blocked:engine_missing" })
+            {
+                var probe = new Dictionary<string, object>
+                    { { "self_check", new Dictionary<string, object> { { "blocked", word } } } };
+                int width = TextRenderer.MeasureText(CodexNote(probe), Font).Width;
+                if (width > widest) { widest = width; longest = word; }
+            }
+            var changed = new Dictionary<string, object>(reply);
+            var status = new Dictionary<string, object>(Map(reply, "status") ?? new Dictionary<string, object>());
+            var watcher = new Dictionary<string, object>(Map(status, "watcher") ?? new Dictionary<string, object>());
+            watcher["self_check"] = new Dictionary<string, object>
+            {
+                { "blocked", longest },
+                { "unknown_error", new Dictionary<string, object> { { "code", "responseStreamConnectionFailedOnRetry" }, { "count", 999999.0 } } },
+                { "layout_untested", "0.167.0-alpha.123456789.98765432" },
+                { "updated_from", "0.6.26-beta.12345678901234567890" },
+            };
+            status["watcher"] = watcher;
+            changed["status"] = status;
+            var pending = new List<object>();
+            foreach (object entry in Items(reply, "pending") ?? new List<object>())
+            {
+                var row = entry as Dictionary<string, object>;
+                if (row == null) { pending.Add(entry); continue; }
+                var held = new Dictionary<string, object>(row);
+                var overlays = new List<object>(Items(row, "overlays") ?? new List<object>());
+                overlays.Add("codex_changed");
+                held["overlays"] = overlays;
+                pending.Add(held);
+            }
+            changed["pending"] = pending;
+            return changed;
         }
 
         private static Dictionary<string, object> WithoutRows(Dictionary<string, object> reply)
