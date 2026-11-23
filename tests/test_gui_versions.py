@@ -392,7 +392,10 @@ class WindowTests(unittest.TestCase):
         listing = self.body("StartVersionsListing")
         self.assertLess(listing.index("SetBusy(true);"), listing.index("QueueUserWorkItem("))
         apply = listing[listing.index("MethodInvoker apply"):]
-        self.assertLess(apply.index("SetBusy(false);"), apply.index("if (mine != versionsToken || dialog.IsDisposed) return;"))
+        # v0.6.26 (fourth-round C2): the wait ends as the dialog closes (OpenVersions), and an answer that comes after
+        # it acts on nothing (tests/test_gui_versions_closed.py).
+        self.assertLess(apply.index("if (mine != versionsToken || dialog.IsDisposed) return;"), apply.index("EndVersionsWait();"))
+        self.assertIn("EndVersionsWait();", self.body("OpenVersions"))
         self.assertNotIn("Kill", listing)
 
     def test_the_list_never_scrolls_sideways_however_narrow_windows_makes_the_dialog(self):
