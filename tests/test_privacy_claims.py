@@ -255,15 +255,22 @@ class CodePropertyTests(unittest.TestCase):
                              r"chatgpt\.com/backend-api/|"
                              r"www\.python\.org|agent-plugins\.org|schemas\.microsoft\.com|"
                              r"docs\.microsoft\.com|learn\.microsoft\.com)/?", re.I)
+        # Every tree that ships or is compiled into what ships (audit4 D4, E7): the bare-host test's own set, so the two
+        # read the same files - the window's and the setup program's sources, the skills, .codex-plugin/, .agents/ and
+        # the plugin's .mcp.json among them - and the api.github.com pin below holds over all of them.
+        from test_privacy_bare_hosts import shipped_files
         offenders, api = [], set()
-        for path in tracked("scripts/*") + tracked("build/install/*") + tracked("src/*") + tracked("advanced/src/*"):
+        for path in shipped_files():
             try:
                 text = path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
-            courier = str(path.relative_to(ROOT)).replace("\\", "/").startswith(COURIER)
+            name = str(path.relative_to(ROOT)).replace("\\", "/")
+            courier = name.startswith(COURIER)
             for url in re.findall(r"https?://[^\s\"'`)\]]+", text):
-                if not allowed.match(url) and not (courier and COURIER_HOSTS.match(url)):
+                if (not allowed.match(url) and not (courier and COURIER_HOSTS.match(url))
+                        and not MANIFEST_NAMESPACE.match(url)
+                        and not (name == EXAMPLE_ADDRESSES_IN and EXAMPLE_ADDRESSES.match(url))):
                     offenders.append("%s: %s" % (path.relative_to(ROOT), url))
                 if url.startswith("https://api.github.com"):
                     api.add(url)
