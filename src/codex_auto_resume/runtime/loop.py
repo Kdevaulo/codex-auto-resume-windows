@@ -22,10 +22,7 @@ from pathlib import Path
 
 from .. import compatio, config, failures, l10n, machine, power
 from ..codex.pairing import app_running_now
-try:
-    from ..codex import layout as codex_layout          # v0.6.26: the layout seat's (codex/layout.py)
-except ImportError:                                     # pragma: no cover - a tree without it says nothing of it
-    codex_layout = None
+from ..codex import layout as codex_layout
 from ..codex.paths import DB_KINDS, newest_generation
 from ..domain import public
 from ..engine import impossible
@@ -528,9 +525,7 @@ class WatchLoop:
         """#6 and #11: (Codex's version where the app runs in a layout this version has not been tested on, the version
         of this product it was updated from where no look since has paired a server and that version's did), each None
         - read from what the watcher keeps of the layout (codex/layout.py, Paths.codex_layout_file), never a path."""
-        # Paths.codex_layout_file is the layout seat's too (config/codex-layout.json).
-        path = getattr(self.paths, "codex_layout_file", self.paths.state_dir / "codex-layout.json")
-        kept = codex_layout.read(path) if codex_layout is not None else None
+        kept = codex_layout.read(self.paths.codex_layout_file)
         if not isinstance(kept, dict):
             return None, None
         found = kept.get("layout") if isinstance(kept.get("layout"), dict) else {}
