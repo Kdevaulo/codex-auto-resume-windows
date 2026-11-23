@@ -10,7 +10,13 @@
 // menu open (v0.6.18), an action in flight (v0.6.20: SetBusy), the answers of another state of the installation
 // (paused), Why it is waiting scrolled, a dialog the window opened (Timeline) over it with the veil under it, the moment
 // of its lights and of the light's sweep (v0.6.24) - waits until it holds still as a capture waits (Settled), and draws
-// itself into a bitmap; only what changed since the frame before is written.
+// itself into a bitmap; only what changed since the frame before is written. v0.6.26 (audit-apng M3-M7): the row menu,
+// a drop-down's list and a dialog fade in at the frame's moment of their opening, the menu and the list fade out, a
+// drop-down with its list open looks open, and Retry now's answer is taken as the window takes it. v0.6.26 (audit-apng
+// M6): a frame that carries its moment on the picture's clock (`moment`, build/motion_window.frame_state) is drawn with
+// every glide at that moment - a control's hover and press, the current tab, the busy look, the light's colour - each
+// begun by the control's own change at the frame it began at and drawn at each frame after on the picture's clock
+// (Transition.RenderMs), never the wall clock's.
 
 using System;
 using System.Collections.Generic;
@@ -150,33 +156,63 @@ namespace CodexAutoResume
                 ParseArguments(arguments.ToArray());
                 var forms = Map(job, "forms") ?? new Dictionary<string, object>();
                 var targets = Items(job, "targets") ?? new List<object>();
+                // v0.6.26 (audit-apng M6): a job whose frames carry their moment draws every glide on the picture's clock
+                // (Transition.RenderMs, set for each frame below), and as a person with Windows' animation effects on sees it
+                // (the default), whatever this machine's switch says - GitHub's runner has it off (Soft.WindowsAnimates) -
+                // so the picture is the same on any machine, as the light's moment is pinned (Soft.StillLightMs). The render
+                // stands its own answer in that input as a probe does; a job without moments (the stills, the fidelity check)
+                // is as before.
+                Dictionary<string, object> before = null;
+                string beforeLocale = null;
+                if (Clocked(Items(job, "frames"))) Soft.WindowsAnimates = delegate { return true; };
                 foreach (object item in Items(job, "frames") ?? new List<object>())
                 {
                     var frame = item as Dictionary<string, object>;
                     if (frame == null) continue;
                     string locale = Str(frame, "locale") ?? "en";
+                    double moment = RenderMs(frame, "moment");
                     // Another state of the installation answers its reads (a paused watcher: `variant` "paused" reads
                     // the replies the job gives for "<locale>-paused"): the window is opened again on them, as it is for
                     // another language.
                     string variant = Str(frame, "variant");
                     string answersOf = variant == null ? locale : locale + "-" + variant;
-                    if (form == null || formLocale != answersOf)
+                    bool opened = form == null || formLocale != answersOf;
+                    if (opened)
                     {
+                        // v0.6.26 (audit-apng M6): another state of the installation in the same language is the same window on
+                        // a screen, its answer just come: the window opened again on it is first put, arrived, in the state the
+                        // frame before showed (an action in flight, its light the working one), and this frame's changes - the
+                        // call over, the light to the paused colour - glide from there at its moment, as the window glides them.
+                        // A new language is a window opened again (Reopen): arrived, as it opens.
+                        Dictionary<string, object> carried = form != null && moment >= 0 && before != null && beforeLocale == locale
+                            ? Carried(before) : null;
                         if (form != null) form.Dispose();
                         form = null;
+                        Transition.RenderMs = Transition.Live;
                         renderAnswers = Items(Map(forms, answersOf), "answers");
                         form = OpenForRender(writer);
                         formLocale = answersOf;
+                        if (carried != null)
+                        {
+                            Transition.RenderMs = Transition.Arrived;
+                            form.RenderState(carried, writer);
+                            opened = false;
+                        }
                     }
+                    // The frame's moment; the first frame of a window opened anew is set up as it stands.
+                    Transition.RenderMs = moment < 0 ? Transition.Live : opened ? Transition.Arrived : moment;
                     form.RenderState(frame, writer);
+                    before = frame;
+                    beforeLocale = locale;
                     int index = Convert.ToInt32(frame["index"], CultureInfo.InvariantCulture);
+                    // v0.6.26: a frame with the window's own edge is cut before what lies over the window is laid (EdgeFirst).
                     using (Bitmap picture = form.RenderPicture(frame, writer))
                     {
-                        if (renderEdgeDpi > 0)
+                        if (renderEdgeDpi > 0 && !EdgeFirst)
                             using (Bitmap edged = CornerStill(picture, renderEdgeDpi))
-                                writer.Write(index, edged, form.RenderBounds(targets, frame));
+                                writer.Write(index, edged, form.RenderBounds(targets, frame), form.renderVeil);
                         else
-                            writer.Write(index, picture, form.RenderBounds(targets, frame));
+                            writer.Write(index, picture, form.RenderBounds(targets, frame), form.renderVeil);
                         if (renderStill != null)
                             // v0.6.24 W5: cut by the same decision as the window - its own corner while the switch is on (the job
                             // says so, make_screenshots.still_job), else Windows' 8 px circle as a capture is cut.
@@ -193,10 +229,32 @@ namespace CodexAutoResume
             finally
             {
                 if (form != null) form.Dispose();
+                Transition.RenderMs = Transition.Live;
                 PersistentBridge.Answers = null;
                 lock (RenderMisses) writer.Finish(RenderMisses);
             }
             return writer.Error == null ? 0 : 2;
+        }
+
+        /// v0.6.26 (audit-apng M6): whether the job's frames carry their moment on the picture's clock (`moment`).
+        private static bool Clocked(List<object> frames)
+        {
+            if (frames == null) return false;
+            foreach (object item in frames)
+            {
+                var frame = item as Dictionary<string, object>;
+                if (frame != null && frame.ContainsKey("moment")) return true;
+            }
+            return false;
+        }
+
+        /// v0.6.26 (audit-apng M6): the frame before, as a window opened again is put in it: its state without the answer it
+        /// took (taken once, by the window it was taken in).
+        private static Dictionary<string, object> Carried(Dictionary<string, object> before)
+        {
+            var carried = new Dictionary<string, object>(before);
+            carried.Remove("answered");
+            return carried;
         }
 
         /// v0.6.20: the scale the job's pictures are drawn at. A job naming `scale` (build/make_screenshots.py PINNED_SCALE,
@@ -221,6 +279,24 @@ namespace CodexAutoResume
             AdoptTextSize(text, TextScale.Fitting(text, Screen.PrimaryScreen.WorkingArea.Size, DpiScale));
         }
 
+        /// v0.6.26 (audit-apng M2): the window's font in a render whose scale the job pinned - Windows' UI font at its size
+        /// and style, in the face an English Windows has (Segoe UI, Typeface.Segoe), whatever Windows this machine is: the
+        /// window then sets each language in the face that language's Windows sets it in, as the product does
+        /// (Typeface.ForLanguage: ko Malgun Gothic, ja Yu Gothic UI, zh-CN Microsoft YaHei UI, zh-TW Microsoft JhengHei UI,
+        /// th Leelawadee UI, the rest Segoe UI). Before, the English pictures made on a Korean Windows kept its Malgun
+        /// Gothic, which draws a backslash as a won sign. Null - the machine's own font, as before - in a render that pins
+        /// no scale.
+        private static Font RenderFont()
+        {
+            if (!RenderPinned) return null;
+            Font box = SystemFonts.MessageBoxFont;
+            Font face;
+            try { face = new Font(Typeface.Segoe, box.SizeInPoints, box.Style, GraphicsUnit.Point); }
+            catch (ArgumentException) { return null; }
+            if (!string.Equals(face.FontFamily.Name, Typeface.Segoe, StringComparison.OrdinalIgnoreCase)) return null;
+            return AtDisplayScale(TextScale.Apply(face, textRead, TextSize));
+        }
+
         /// v0.6.20: whether this is a render whose scale the job pinned (AdoptRenderScale): the window opens at its own size
         /// on no screen (KeepOnScreen), and a list's header is laid out at that scale (SoftList.PinnedHeader). False in
         /// every window a person opens.
@@ -231,7 +307,7 @@ namespace CodexAutoResume
         {
             var strings = RenderAnswer("strings", null);
             string nowhere = Path.Combine(Path.GetTempPath(), "codex-auto-resume-render-" + Guid.NewGuid().ToString("N"));
-            var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, null);
+            var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, RenderFont());
             form.rendering = true;
             // v0.6.20: the client area the window opened with - its opening size, as a language's face scales it (Microsoft
             // YaHei UI opens it wider and shorter) - kept when its frame is taken off; it was set back to the opening
@@ -370,6 +446,8 @@ namespace CodexAutoResume
             RenderSelected(Map(frame, "selected"));
             RenderScroll(page, Map(frame, "scroll"));
             RenderExplain(page, Map(frame, "explain"));
+            // v0.6.26 (audit-apng M5): a drop-down whose list is open looks open - its edge a step darker, its chevron turned.
+            RenderComboOpen(Map(frame, "droplist"));
             RenderFace(Str(frame, "hover"), Str(frame, "pressed"), writer);
             object light;
             Soft.StillLightMs = frame.TryGetValue("light", out light) && light != null
@@ -378,6 +456,8 @@ namespace CodexAutoResume
             // is the working one (BusyLight). After the moment of the lights, which the header reads as it follows.
             object working;
             RenderBusy(frame.TryGetValue("busy", out working) && Equals(working, true));
+            // v0.6.26 (audit-apng M7): the answer of an action the frame says came, taken as the window takes it.
+            RenderAnswered(Str(frame, "answered"), writer);
             object sweeping;
             RenderSweep(frame.TryGetValue("sweep", out sweeping) && sweeping != null
                 ? Convert.ToDouble(sweeping, CultureInfo.InvariantCulture) : -1);
@@ -403,21 +483,177 @@ namespace CodexAutoResume
         // Whether the last frame had an action in flight (RenderBusy).
         private bool renderBusy;
 
+        // v0.6.26 (review P2): the picture's moment the call in flight began at, while its first moments are held, or -1.
+        private double renderBusyAt = -1;
+
         /// The window's own count of an action in flight, raised or let go as the frame says: SetBusy, which waits on
         /// nothing - what a Retry now, a Pause or a Rescan raises for as long as the bridge's call lasts.
+        /// v0.6.26 (review P2): on the picture's clock its first moments are held as the product holds them (BusyHold): the
+        /// buttons keep their look for BusyHold.Milliseconds from the frame the call began, then glide to it - from that
+        /// moment, whichever frame comes next - and a call that ends inside the hold shows nothing. Its timer never runs
+        /// here: the hold ends on the picture's clock (RenderHoldOver). Outside it (a still, a window set up as it stands) a
+        /// picture of a call in flight is of one that has lasted.
         private void RenderBusy(bool on)
         {
+            RenderHoldOver();
             if (on == renderBusy) return;
             renderBusy = on;
+            renderBusyAt = -1;
             SetBusy(on);
-            if (on) BusyHold.Lapse();       // a picture of a call in flight is of one that has lasted, not of its first 150 ms
-            // Every button's look has just begun to glide; a picture is of where it ends.
+            if (on && Transition.RenderMs >= 0 && BusyHold.On)
+            {
+                renderBusyAt = Transition.RenderMs;
+                StopHoldTimer();
+            }
+            else if (on) BusyHold.Lapse();       // a picture of a call in flight is of one that has lasted, not of its first 150 ms
+            // Every button's look has just begun to glide: on the picture's clock (v0.6.26, audit-apng M6) drawn at each
+            // frame's moment from here, nothing counted as moving; on the wall clock a picture is of where it ends.
             var waited = Stopwatch.StartNew();
             while (Transition.Moving > 0 && waited.ElapsedMilliseconds < RenderSettleLimit)
             {
                 Application.DoEvents();
                 System.Threading.Thread.Sleep(5);
             }
+        }
+
+        /// v0.6.26 (review P2): the call's held first moments over, at their own moment on the picture's clock, once a frame
+        /// is at or past it: the buttons begin their glide to the busy look from there (BusyHold.Lapse, as its timer would).
+        private void RenderHoldOver()
+        {
+            double moment = Transition.RenderMs;
+            if (renderBusyAt < 0 || moment < 0) return;
+            double over = renderBusyAt + BusyHold.Milliseconds;
+            if (moment < over) return;
+            renderBusyAt = -1;
+            if (!BusyHold.On) return;
+            try
+            {
+                Transition.RenderMs = over;
+                BusyHold.Lapse();
+            }
+            finally { Transition.RenderMs = moment; }
+        }
+
+        // BusyHold's wall-clock timer stopped: on the picture's clock the hold ends at its moment, never at a real 150 ms.
+        private static void StopHoldTimer()
+        {
+            var field = typeof(BusyHold).GetField("timer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var timer = field == null ? null : field.GetValue(null) as Timer;
+            if (timer != null) timer.Stop();
+        }
+
+        // The action whose answer the last frame took (RenderAnswered), or null.
+        private string renderAnswered;
+
+        /// v0.6.26 (audit-apng M7): an action's answer, as the window takes it - `retry-now`: the window's own Retry now
+        /// (RetryNow) on the chosen Pending row, its call answered from the job's replies (the pinned installation's own
+        /// answer, build/motion_window.py answers), so the note under the list says what the product says for that answer
+        /// (ShowPendingNote). Once, when a frame first names it; nothing again while frames go on naming it.
+        private void RenderAnswered(string command, RenderWriter writer)
+        {
+            if (command == renderAnswered) return;
+            renderAnswered = command;
+            if (command == null) return;
+            if (command != "retry-now") { writer.Note("no action is called " + command); return; }
+            var row = Selected(pendingList);
+            if (row == null) { writer.Note("Retry now is answered with no Pending row chosen"); return; }
+            // Only an answer the job gives: a refusal would have the window say so in a box of its own, never drawn here.
+            if (!Ok(RenderAnswer("retry-now", IdArgument(row)))) { writer.Note("Retry now on the chosen row was not answered"); return; }
+            RetryNow();
+            if (!HoldStill(true)) writer.Note("Retry now's answer did not hold still: " + Unsettled());
+        }
+
+        /// A frame's moment `key` (`appear_ms`, `close_ms`) of something opening or closing, in ms, or -1 when it has none.
+        private static double RenderMs(Dictionary<string, object> state, string key)
+        {
+            object given;
+            return state != null && state.TryGetValue(key, out given) && given != null
+                ? Convert.ToDouble(given, CultureInfo.InvariantCulture) : -1;
+        }
+
+        /// v0.6.26 (audit-apng M4, M5): how opaque, and how far below its place, a card that opens as the row menu and the
+        /// drop-down's list open (SoftMenuLayer.Tick, SoftDropList.PaintAt) is `appear` ms into its opening: fading in and
+        /// rising SpaceXs into place over Motion.Duration on Motion.Ease. Arrived for -1.
+        internal static void RenderOpening(double appear, out int alpha, out int rise)
+        {
+            double t = appear < 0 ? 1.0 : appear / Math.Max(1, Motion.Duration);
+            double eased = Motion.Ease(Math.Min(1.0, t));
+            alpha = t >= 1.0 ? 255 : (int)Math.Round(255 * eased);
+            rise = t >= 1.0 ? 0 : (int)Math.Round(Soft.Px(Brand.SpaceXs) * (1.0 - eased));
+        }
+
+        /// v0.6.26 (audit-apng M4, M5): how opaque the last picture of a closed menu or list is `ms` into its fade-out from
+        /// `from` (SoftLayerFade.Tick, SoftDropList.FadeFrame): over Motion.Press on Motion.Ease, then gone.
+        internal static int RenderClosing(double ms, int from)
+        {
+            double part = ms / Math.Max(1, Motion.Press);
+            return part >= 1.0 ? 0 : (int)Math.Round(from * (1.0 - Motion.Ease(Math.Max(0.0, part))));
+        }
+
+        /// `image` over `picture` at `at`, `alpha` (0 to 255) as opaque as it is drawn, as a layered window of that alpha is laid.
+        private static void LayFaded(Bitmap picture, Bitmap image, Point at, int alpha)
+        {
+            if (image == null || alpha <= 0) return;
+            using (Graphics g = Graphics.FromImage(picture))
+            {
+                if (alpha >= 255) { g.DrawImage(image, at.X, at.Y, image.Width, image.Height); return; }
+                using (var faded = new ImageAttributes())
+                {
+                    var matrix = new ColorMatrix();
+                    matrix.Matrix33 = alpha / 255f;
+                    faded.SetColorMatrix(matrix);
+                    g.DrawImage(image, new Rectangle(at.X, at.Y, image.Width, image.Height), 0, 0, image.Width, image.Height,
+                                GraphicsUnit.Pixel, faded);
+                }
+            }
+        }
+
+        // The drop-down the last frame gave its open look (RenderComboOpen), or null.
+        private SoftCombo renderOpened;
+
+        /// v0.6.26 (audit-apng M5): the drop-down whose list the frame has open (not closing) in its open look, as OpenList
+        /// leaves it - its edge a step darker (FaceWanted while Open) and its chevron turned up - and the one before in its
+        /// closed look again. The list itself is drawn over the picture (RenderDropList); the drop-down is only told it has
+        /// one, never shown it. v0.6.26 (review P1): each by the drop-down's own change, as OpenList and CloseList make it -
+        /// its face's glide told (faceGlide.Changed) and its chevron sent round (chevron.To, Motion.Allowed) - so on the
+        /// picture's clock both glide over brand's transition from the frame the list opens or closes; outside it, at once.
+        private void RenderComboOpen(Dictionary<string, object> listed)
+        {
+            SoftCombo wanted = null;
+            Control editor;
+            if (listed != null && RenderMs(listed, "close_ms") < 0 && editors.TryGetValue(Str(listed, "field") ?? "", out editor))
+                wanted = editor as SoftCombo;
+            if (wanted == renderOpened) return;
+            if (renderOpened != null && !renderOpened.IsDisposed) ComboLooksOpen(renderOpened, false);
+            renderOpened = wanted;
+            if (wanted != null) ComboLooksOpen(wanted, true);
+        }
+
+        private static void ComboLooksOpen(SoftCombo combo, bool open)
+        {
+            const System.Reflection.BindingFlags own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            System.Reflection.FieldInfo drop = typeof(SoftCombo).GetField("drop", own);
+            System.Reflection.FieldInfo turn = typeof(SoftCombo).GetField("chevron", own);
+            if (drop == null || turn == null) return;
+            var was = drop.GetValue(combo) as SoftDropList;
+            if (open && was == null) drop.SetValue(combo, new SoftDropList(combo));
+            else if (!open && was != null)
+            {
+                drop.SetValue(combo, null);
+                was.Dispose();
+            }
+            double clock = Transition.RenderMs;
+            if (clock == Transition.Live) Transition.RenderMs = Transition.Arrived;
+            try
+            {
+                var face = typeof(SoftCombo).GetField("faceGlide", own) == null ? null
+                         : typeof(SoftCombo).GetField("faceGlide", own).GetValue(combo) as SoftSurfaceGlide;
+                if (face != null) face.Changed();
+                var chevron = turn.GetValue(combo) as Transition;
+                if (chevron != null) chevron.To(open ? 1.0 : 0.0, Motion.Allowed(combo));
+            }
+            finally { Transition.RenderMs = clock; }
+            combo.Invalidate();
         }
 
         /// Why it is waiting scrolled `notches` turns of the wheel down, the last of them `glide_ms` into its glide: its
@@ -530,34 +766,87 @@ namespace CodexAutoResume
             return offset;
         }
 
-        /// The hover or pressed face of the control a frame names, as the pointer gives it: the control's own
-        /// `hover` flag and its own Press - nothing a control does not draw of its own. A name the window has no
-        /// control for is noted.
+        // Whether the control the last frame gave a face has it pressed.
+        private bool renderFacedPressed;
+
+        /// The hover or pressed face of the control a frame names, as the pointer gives it: the control's own change of its
+        /// `hover` flag and its own Press - nothing a control does not draw of its own - made only when the face changes, so
+        /// a glide it starts goes on over the frames after (v0.6.26, audit-apng M6: it was taken off and given again every
+        /// frame, and a press's glide began anew at each). A name the window has no control for is noted.
         private void RenderFace(string hover, string pressed, RenderWriter writer)
         {
-            if (renderFaced != null) SetRenderFace(renderFaced, false, false);
-            renderFaced = null;
             string name = pressed ?? hover;
+            Control control = null;
             // A row of an open list, a Pending row or an item of the row menu: drawn by RenderPicture, not a control's face.
-            if (name == null || name.StartsWith("row.", StringComparison.Ordinal) ||
-                name.StartsWith("task.", StringComparison.Ordinal) || name.StartsWith("menu.", StringComparison.Ordinal) ||
-                name.StartsWith("dialog.", StringComparison.Ordinal)) return;
-            Control control = RenderControl(name) ?? FocusTarget(name);
-            if (control == null) { writer.Note("no control is called " + name); return; }
-            SetRenderFace(control, true, pressed != null);
+            if (name != null && !name.StartsWith("row.", StringComparison.Ordinal) &&
+                !name.StartsWith("task.", StringComparison.Ordinal) && !name.StartsWith("menu.", StringComparison.Ordinal) &&
+                !name.StartsWith("dialog.", StringComparison.Ordinal))
+            {
+                control = RenderControl(name) ?? FocusTarget(name);
+                if (control == null) writer.Note("no control is called " + name);
+            }
+            bool down = control != null && pressed != null;
+            if (control == renderFaced && down == renderFacedPressed) return;
+            if (renderFaced != null && renderFaced != control && !renderFaced.IsDisposed) SetRenderFace(renderFaced, false, false);
+            if (control != null) SetRenderFace(control, true, down);
             renderFaced = control;
+            renderFacedPressed = down;
         }
 
+        /// `control` given its hover and pressed face as the pointer gives them, by its own change: its Press (a press and
+        /// its release, in brand's press time), and its `hover` flag with the glide its pointer's coming and going starts
+        /// (its Hover, or its SoftSurfaceGlide's Changed in brand's transition) - entering, the hover first; leaving, the
+        /// press first, as its own OnMouseEnter and OnMouseLeave take them. No event is raised: nothing but its face changes
+        /// (a caption button's tip is never asked for). Outside a picture's clock, arrived at once.
         private static void SetRenderFace(Control control, bool hover, bool pressed)
         {
-            const System.Reflection.BindingFlags own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-            Type type = control.GetType();
-            System.Reflection.FieldInfo hovered = type.GetField("hover", own);
-            if (hovered != null && hovered.FieldType == typeof(bool)) hovered.SetValue(control, hover);
-            System.Reflection.MethodInfo press = type.GetMethod("Press", own, null, new[] { typeof(bool) }, null);
-            if (press != null) press.Invoke(control, new object[] { pressed });
+            double clock = Transition.RenderMs;
+            if (clock == Transition.Live) Transition.RenderMs = Transition.Arrived;
+            try
+            {
+                if (hover) { RenderHover(control, true); RenderPress(control, pressed); }
+                else { RenderPress(control, false); RenderHover(control, false); }
+            }
+            finally { Transition.RenderMs = clock; }
             control.Invalidate();
             if (control.Parent != null) control.Parent.Invalidate(true);
+        }
+
+        private const System.Reflection.BindingFlags RenderOwn = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+
+        private static void RenderHover(Control control, bool over)
+        {
+            Type type = control.GetType();
+            // v0.6.26 (audit-apng M5): the drop-down keeps its pointer's hover as faceHover.
+            System.Reflection.FieldInfo hovered = type.GetField("hover", RenderOwn) ?? type.GetField("faceHover", RenderOwn);
+            if (hovered == null || hovered.FieldType != typeof(bool) || (bool)hovered.GetValue(control) == over) return;
+            System.Reflection.MethodInfo own = type.GetMethod("Hover", RenderOwn, null, new[] { typeof(bool) }, null);
+            if (own != null) { own.Invoke(control, new object[] { over }); return; }
+            hovered.SetValue(control, over);
+            RenderGlide(control, Motion.Duration);
+        }
+
+        private static void RenderPress(Control control, bool down)
+        {
+            Type type = control.GetType();
+            System.Reflection.MethodInfo press = type.GetMethod("Press", RenderOwn, null, new[] { typeof(bool) }, null);
+            if (press != null) { press.Invoke(control, new object[] { down }); return; }
+            // A control with no Press of its own (a caption button) keeps its press as `pressed`, its glide in the press time.
+            System.Reflection.FieldInfo held = type.GetField("pressed", RenderOwn);
+            if (held == null || held.FieldType != typeof(bool) || (bool)held.GetValue(control) == down) return;
+            held.SetValue(control, down);
+            RenderGlide(control, Motion.Press);
+        }
+
+        // The control's own glides told its state has changed, in `milliseconds`.
+        private static void RenderGlide(Control control, int milliseconds)
+        {
+            foreach (System.Reflection.FieldInfo field in control.GetType().GetFields(RenderOwn))
+            {
+                if (field.FieldType != typeof(SoftSurfaceGlide)) continue;
+                var glide = field.GetValue(control) as SoftSurfaceGlide;
+                if (glide != null) glide.Changed(milliseconds);
+            }
         }
 
         /// v0.6.24-beta.3: the day's scene under `root` (SoftDayScene, the header's child above its card) laid down over the
@@ -680,6 +969,17 @@ namespace CodexAutoResume
             PaintSceneOver(picture, this);
             PaintCaptionOver(picture, this);
             PaintListGutters(picture);
+            // v0.6.26: the window's own outer edge - its corner and its hairline - cut now, before anything is laid over the
+            // window: what lies over it on the screen is a window of its own (the row menu, a drop-down's list, a dialog
+            // and the veil under it), never cut by the window's corner, and the veil dims the window's hairline as it dims
+            // the rest of the window (PaintVeil).
+            if (renderEdgeDpi > 0 && EdgeFirst)
+            {
+                Bitmap edged = CornerStill(picture, renderEdgeDpi);
+                picture.Dispose();
+                picture = edged;
+            }
+            renderVeil = null;
             renderRows = null;
             renderMenu = null;
             renderDialogBounds = null;
@@ -687,16 +987,22 @@ namespace CodexAutoResume
             // card where it opens.
             RenderDropList(picture, Map(frame, "droplist"), writer);
             var menu = Map(frame, "menu");
-            if (menu != null) RenderMenu(picture, Str(menu, "at"), Str(frame, "hover"), writer);
+            if (menu != null) RenderMenu(picture, menu, Str(frame, "hover"), writer);
             // v0.6.20: a dialog the window opened, centred over it: a top-level window of its own, drawn by its own
             // controls, with the title bar Windows draws round it.
             var dialog = Map(frame, "dialog");
             if (dialog != null) RenderDialog(picture, dialog, Str(frame, "hover"), Str(frame, "pressed"), writer);
+            else renderCloseOver = renderCloseDown = -1;
             return picture;
         }
 
         // The items of the row menu the last picture showed open, by name (`menu.<n>`), in client coordinates.
         private Dictionary<string, Rectangle> renderMenu;
+        // v0.6.26 (audit-apng M4, M5): the last picture of the row menu and of a drop-down's list, where it stood and how
+        // opaque - what the product fades out once it has closed (SoftLayerFade, SoftDropList.FadeOut).
+        private Bitmap renderMenuLast, renderListLast;
+        private Point renderMenuLastAt, renderListLastAt;
+        private int renderMenuLastAlpha, renderListLastAlpha;
 
         /// The Pending row `name` names (`task.<n>`) in client coordinates, and its index; false when it is not shown.
         private bool RenderTask(string name, out Rectangle bounds, out int index)
@@ -716,8 +1022,17 @@ namespace CodexAutoResume
         /// The row menu of the Pending row `at` names, as a right click there opens it - filled by FillRowMenu as the
         /// menu's Opening fills it, the item `hover` names (`menu.<n>`) in hand - drawn by its own card (SoftMenuLayer)
         /// with the card's corner where the pointer is (RenderMenuPlace), and its items named for the pointer.
-        private void RenderMenu(Bitmap picture, string at, string hover, RenderWriter writer)
+        private void RenderMenu(Bitmap picture, Dictionary<string, object> menu, string hover, RenderWriter writer)
         {
+            // v0.6.26 (audit-apng M4): closed, its last picture fades out where it stood (SoftMenuLayer.Closed, SoftLayerFade).
+            double closing = RenderMs(menu, "close_ms");
+            if (closing >= 0)
+            {
+                if (renderMenuLast == null) { writer.Note("the row menu closes with no picture of it open"); return; }
+                LayFaded(picture, renderMenuLast, renderMenuLastAt, RenderClosing(closing, renderMenuLastAlpha));
+                return;
+            }
+            string at = Str(menu, "at");
             Rectangle row;
             int index;
             if (!RenderTask(at, out row, out index)) { writer.Note("no Pending row is called " + at); return; }
@@ -742,7 +1057,14 @@ namespace CodexAutoResume
             // Where the pointer stands on the row: its centre, as the pointer is put on a target (motion_compose.locate).
             var anchor = new Point(row.X + row.Width / 2, row.Y + row.Height / 2);
             Point corner = RenderMenuPlace(anchor, image.Size, SoftMenuLayer.Reach, ClientSize);
-            using (Graphics g = Graphics.FromImage(picture)) g.DrawImage(image, corner.X, corner.Y, image.Width, image.Height);
+            // v0.6.26 (audit-apng M4): opening, it fades in and rises into place (SoftMenuLayer.Open, Tick), `appear_ms` in.
+            int alpha, rise;
+            RenderOpening(RenderMs(menu, "appear_ms"), out alpha, out rise);
+            LayFaded(picture, image, new Point(corner.X, corner.Y + rise), alpha);
+            if (renderMenuLast != null) renderMenuLast.Dispose();
+            renderMenuLast = (Bitmap)image.Clone();
+            renderMenuLastAt = new Point(corner.X, corner.Y + rise);
+            renderMenuLastAlpha = alpha;
             renderMenu = new Dictionary<string, Rectangle>();
             for (int i = 0; i < pendingMenu.Items.Count; i++)
             {
@@ -770,6 +1092,14 @@ namespace CodexAutoResume
         private void RenderDropList(Bitmap picture, Dictionary<string, object> listed, RenderWriter writer)
         {
             if (listed == null) return;
+            // v0.6.26 (audit-apng M5): closed, its last picture fades out where it stood (SoftCombo.CloseList, FadeOut).
+            double closing = RenderMs(listed, "close_ms");
+            if (closing >= 0)
+            {
+                if (renderListLast == null) { writer.Note("the drop list closes with no picture of it open"); return; }
+                LayFaded(picture, renderListLast, renderListLastAt, RenderClosing(closing, renderListLastAlpha));
+                return;
+            }
             Control editor;
             var combo = editors.TryGetValue(Str(listed, "field") ?? "", out editor) ? editor as SoftCombo : null;
             if (combo == null) { writer.Note("no drop-down is called " + Str(listed, "field")); return; }
@@ -797,15 +1127,11 @@ namespace CodexAutoResume
                 int rise = list.CardOnScreen.Y - card.Y;
                 int left = field.X + card.X - screenField.X - margin.Left;
                 int top = field.Y + card.Y - screenField.Y - margin.Top + rise;
-                using (Graphics g = Graphics.FromImage(picture))
-                using (var faded = new ImageAttributes())
-                {
-                    var matrix = new ColorMatrix();
-                    matrix.Matrix33 = list.Alpha / 255f;
-                    faded.SetColorMatrix(matrix);
-                    g.DrawImage(image, new Rectangle(left, top, image.Width, image.Height), 0, 0, image.Width, image.Height,
-                                GraphicsUnit.Pixel, faded);
-                }
+                LayFaded(picture, image, new Point(left, top), list.Alpha);
+                if (renderListLast != null) renderListLast.Dispose();
+                renderListLast = (Bitmap)image.Clone();
+                renderListLastAt = new Point(left, top);
+                renderListLastAlpha = list.Alpha;
                 renderRows = new Dictionary<string, Rectangle>();
                 for (int i = 0; i < combo.Items.Count; i++)
                 {
@@ -858,6 +1184,25 @@ namespace CodexAutoResume
         private static List<object> Box(Rectangle rect)
         {
             return new List<object> { (double)rect.X, (double)rect.Y, (double)rect.Width, (double)rect.Height };
+        }
+
+        /// v0.6.26: whether a frame with the window's own edge (`edge_dpi`) is cut before anything is laid over the window -
+        /// every frame but those of a job that also asks for a still, which is cut from the uncut picture (FramedStill,
+        /// SquircleStill) as before.
+        private static bool EdgeFirst { get { return renderStill == null; } }
+
+        /// v0.6.26: the veil the frame lays over the window - its alpha at the window's own pixels and its ink, [a, r, g, b] -
+        /// or null: written with the frame (frames.json `veil`) for the pixels at the window's edge that are only partly the
+        /// window's, which the picture's compositor dims at that share, over whatever lies under them (build/motion_compose.py
+        /// WindowChrome.frame), as the product's veil dims them (DialogVeil: each pixel at its edge coverage).
+        private List<object> renderVeil;
+
+        // The veil at `alpha` as a frame writes it, or null where none is laid (PaintVeil's own rule).
+        private static List<object> VeilOf(int alpha)
+        {
+            if (!DialogVeil.Enabled || Palette.Contrast || alpha <= 0) return null;
+            Color ink = DialogVeil.Ink();
+            return new List<object> { (double)alpha, (double)ink.R, (double)ink.G, (double)ink.B };
         }
 
         // ------------------------------------------------------------------ a dialog the window opened (v0.6.20)
@@ -927,7 +1272,7 @@ namespace CodexAutoResume
                 // v0.6.24: the title row's Close (SoftDialog's caption), where Windows' title bar had its own.
                 var soft = form as SoftDialog;
                 Control close = soft != null && soft.CaptionHost != null ? soft.CaptionHost.CloseButton : null;
-                if (close != null) SetRenderFace(close, hover == "dialog.close" || pressed == "dialog.close", pressed == "dialog.close");
+                if (close != null) RenderCloseFace(close, hover == "dialog.close" || pressed == "dialog.close", pressed == "dialog.close");
                 Application.DoEvents();
                 using (var body = new Bitmap(client.Width, client.Height, PixelFormat.Format32bppArgb))
                 {
@@ -944,8 +1289,19 @@ namespace CodexAutoResume
                     Size outer = new Size(client.Width + 2 * border, client.Height + 2 * border);
                     Point place = RenderDialogPlace(outer, ClientSize);
                     // v0.6.24: the window dimmed under it, as it is for as long as the dialog is open (DialogVeil).
-                    PaintVeil(picture);
-                    PaintDialog(picture, body, place, outer, border, form.BackColor);
+                    // v0.6.26 (audit-apng M3): the dialog fades in over Motion.Duration once it is painted (SoftDialog's
+                    // OpenFade, FadeStep: 255 * Motion.Ease), `appear_ms` in, its own corner's edge and shadow with it, and
+                    // the veil with it (DialogVeil at its fullest times the dialog's alpha, gui-audit D9).
+                    int fade = RenderDialogAlpha(RenderMs(dialog, "appear_ms"));
+                    PaintVeil(picture, (int)Math.Round(DialogVeil.FullNow * fade / 255.0));
+                    renderVeil = VeilOf((int)Math.Round(DialogVeil.FullNow * fade / 255.0));
+                    if (fade >= 255) PaintDialog(picture, body, place, outer, border, form.BackColor);
+                    else if (fade > 0)
+                        using (var under = (Bitmap)picture.Clone())
+                        {
+                            PaintDialog(picture, body, place, outer, border, form.BackColor);
+                            Blend(picture, under, fade);
+                        }
                     renderDialogBounds = new Dictionary<string, Rectangle>();
                     renderDialogBounds["dialog.window"] = new Rectangle(place.X, place.Y, outer.Width, outer.Height);
                     if (close != null)
@@ -957,6 +1313,35 @@ namespace CodexAutoResume
                     }
                 }
             }
+        }
+
+        // v0.6.26 (audit-apng M6): the moments on the picture's clock the pointer came onto the dialog's Close and pressed it,
+        // or -1 - what a dialog built again for each frame is told its Close's glides began at.
+        private double renderCloseOver = -1, renderCloseDown = -1;
+
+        /// The dialog's Close given its face (SetRenderFace) as though it had been on the screen since the pointer came onto
+        /// it: its hover begun at the moment that began, its press at the moment that began, each drawn at this frame's.
+        private void RenderCloseFace(Control close, bool over, bool down)
+        {
+            double moment = Transition.RenderMs;
+            bool clocked = moment >= 0;
+            renderCloseOver = !over ? -1 : renderCloseOver >= 0 ? renderCloseOver : clocked ? moment : -1;
+            renderCloseDown = !down ? -1 : renderCloseDown >= 0 ? renderCloseDown : clocked ? moment : -1;
+            if (!over) return;
+            // Painted once at rest first, as it has been on the screen before the pointer came: a glide starts only from a
+            // look it has shown (SoftSurfaceGlide), and a dialog built anew has shown none.
+            if (clocked && close.Width > 0 && close.Height > 0)
+                using (var seen = new Bitmap(close.Width, close.Height, PixelFormat.Format32bppArgb))
+                    close.DrawToBitmap(seen, new Rectangle(Point.Empty, close.Size));
+            try
+            {
+                if (clocked) Transition.RenderMs = renderCloseOver;
+                SetRenderFace(close, true, false);
+                if (!down) return;
+                if (clocked) Transition.RenderMs = renderCloseDown;
+                SetRenderFace(close, true, true);
+            }
+            finally { Transition.RenderMs = moment; }
         }
 
         /// `icon` at `size` px for a picture: the image the .ico holds for that size, or the next larger, decoded as the PNG
@@ -1004,15 +1389,26 @@ namespace CodexAutoResume
         }
 
         /// v0.6.24: the veil over the window while a dialog of its own is open (DialogVeil), over `picture` - the window's whole
-        /// client area, which its own corner cuts later as it cuts the window (CornerStill): the shadow's ink (DialogVeil.Ink)
-        /// at the veil's alpha at its fullest in the theme (DialogVeil.FullNow: 51 in light, 82 in dark), laid as a layered
-        /// window of that alpha is laid over what is under it. At its fullest from the dialog's first frame, as the veil
-        /// comes on before the dialog is seen, and gone with it; none in High Contrast nor where veils are off, as DialogVeil.Over
-        /// makes none.
+        /// client area: the shadow's ink (DialogVeil.Ink) at the veil's alpha at its fullest in the theme (DialogVeil.FullNow:
+        /// 51 in light, 82 in dark), laid as a layered window of that alpha is laid over what is under it; none in High
+        /// Contrast nor where veils are off, as DialogVeil.Over makes none.
+        /// v0.6.26 (audit-apng M3, guifix D9 and D10): as the product draws it - coming in with the dialog's own fade, step for
+        /// step, at the dialog's alpha of its fullest (the other overload), clear while the dialog is, and going with the
+        /// dialog at once, as the dialog's closing is; and over each of the window's pixels at how much of it is the window's.
+        /// Every pixel here is the window's colour: the frame of a window with its own edge is cut before the veil is laid
+        /// (RenderPicture), so its hairline is dimmed with the rest, as the veil dims the companion's hairline on the screen;
+        /// a pixel the edge covers only in part is dimmed here as a whole one, and the compositor, which lays it over what is
+        /// under it at its coverage, lays it as the product does - the veil at its fullest times that coverage over the
+        /// window's edge and what shows through it alike (the frame's `veil`, build/motion_compose.py WindowChrome.frame).
         internal static void PaintVeil(Bitmap picture)
         {
-            if (!DialogVeil.Enabled || Palette.Contrast) return;
-            int alpha = DialogVeil.FullNow;
+            PaintVeil(picture, DialogVeil.FullNow);
+        }
+
+        /// v0.6.26 (audit-apng M3): the veil at `alpha`, the dialog's fade times its fullest, while the dialog fades in.
+        internal static void PaintVeil(Bitmap picture, int alpha)
+        {
+            if (!DialogVeil.Enabled || Palette.Contrast || alpha <= 0) return;
             Color ink = DialogVeil.Ink();
             int[] pixels = Argb(picture);
             for (int i = 0; i < pixels.Length; i++)
@@ -1029,6 +1425,38 @@ namespace CodexAutoResume
             {
                 for (int y = 0; y < picture.Height; y++)
                     Marshal.Copy(pixels, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
+            }
+            finally { picture.UnlockBits(data); }
+        }
+
+        /// v0.6.26 (audit-apng M3): how opaque the dialog is `appear` ms into its fade-in (SoftDialog.FadeStep): 255 times
+        /// Motion.Ease over Motion.Duration, from clear; at rest (255) for -1.
+        internal static int RenderDialogAlpha(double appear)
+        {
+            if (appear < 0) return 255;
+            double t = appear / Math.Max(1, Motion.Duration);
+            return t >= 1.0 ? 255 : (int)Math.Round(255 * Motion.Ease(t));
+        }
+
+        /// `picture` - the dialog laid whole over `under` - as the dialog's window at `alpha` shows it over what is under:
+        /// each channel `alpha` of the way from under to it, as a layered window of that alpha is composed.
+        internal static void Blend(Bitmap picture, Bitmap under, int alpha)
+        {
+            int[] over = Argb(picture), below = Argb(under);
+            for (int i = 0; i < over.Length; i++)
+            {
+                int a = over[i], b = below[i];
+                over[i] = unchecked((int)0xFF000000) |
+                          (Veiled((b >> 16) & 0xFF, (a >> 16) & 0xFF, alpha) << 16) |
+                          (Veiled((b >> 8) & 0xFF, (a >> 8) & 0xFF, alpha) << 8) |
+                          Veiled(b & 0xFF, a & 0xFF, alpha);
+            }
+            BitmapData data = picture.LockBits(new Rectangle(0, 0, picture.Width, picture.Height), ImageLockMode.WriteOnly,
+                                               PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < picture.Height; y++)
+                    Marshal.Copy(over, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
             }
             finally { picture.UnlockBits(data); }
         }
@@ -1263,7 +1691,7 @@ namespace CodexAutoResume
 
             internal void Failed(string text) { Error = text; }
 
-            internal void Write(int index, Bitmap picture, Dictionary<string, object> bounds)
+            internal void Write(int index, Bitmap picture, Dictionary<string, object> bounds, List<object> veil)
             {
                 width = picture.Width;
                 height = picture.Height;
@@ -1311,6 +1739,8 @@ namespace CodexAutoResume
                 entry["box"] = new List<object> { (double)left, (double)top, (double)(right - left + 1), (double)(bottom - top + 1) };
                 entry["file"] = file;
                 entry["bounds"] = bounds;
+                // v0.6.26: the veil the frame lays over the window (renderVeil), for the compositor's edge.
+                if (veil != null) entry["veil"] = veil;
                 if (frames.Length > 0) frames.Append(",\n");
                 frames.Append(Json.Write(entry));
                 previous = pixels;

@@ -43,7 +43,8 @@
             "awake_since": null,
             "memory_peak": null,
             "ended": null,
-            "ended_at": null
+            "ended_at": null,
+            "self_check": null
           },
           "upgrade_pending": false,
           "startup_enabled": false,
@@ -194,7 +195,8 @@
             "awake_since": null,
             "memory_peak": null,
             "ended": null,
-            "ended_at": null
+            "ended_at": null,
+            "self_check": null
           },
           "upgrade_pending": false,
           "startup_enabled": false,
@@ -351,7 +353,8 @@
             "awake_since": null,
             "memory_peak": null,
             "ended": null,
-            "ended_at": null
+            "ended_at": null,
+            "self_check": null
           },
           "upgrade_pending": false,
           "startup_enabled": false,

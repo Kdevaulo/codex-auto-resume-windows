@@ -1359,6 +1359,8 @@ namespace CodexAutoResume
                       diagUpgrade, diagUpdate, diagMemory, diagPlugin, diagStateAccess, diagStateNote, diagWaiting;
         // v0.6.17: whether the watcher and this window's bridge run inside another app, and what that means.
         private Label diagHostApp, diagHostNote;
+        // v0.6.26: what the watcher's own judge says of Codex (CodexNote), only while it says something.
+        private Label diagCodexNote;
         // v0.6.11: Diagnostics' Show me what happens, which waits while an action runs.
         private Button demoButton;
         private Button exportButton, repairButton, stopButton, updateButton;
@@ -2505,6 +2507,60 @@ namespace CodexAutoResume
         private static void SetNote(Label note, string text)
         {
             if (note.Text != text) note.Text = text;
+        }
+
+        /// v0.6.26 (audit D8; the owner, 2026-11-22, "제안대로 모두 고침"): fact tables of the same shape stacked in one column put
+        /// their values at one x - the widest label column of them all, each table's own widened to it by its first label's
+        /// gap (Fact's 18 px, and the difference): the Overview's Right now and Last 7 days had values 9 px apart in English
+        /// and 55 in German. Again at every layout of what holds them, as the words or the scaling change.
+        private void OneLabelColumn(params TableLayoutPanel[] tables)
+        {
+            var natural = new int[tables.Length];
+            var first = new Control[tables.Length];
+            int widest = 0;
+            for (int i = 0; i < tables.Length; i++)
+            {
+                // The label that makes the column as wide as it is: its gap is the one widened.
+                foreach (Control cell in tables[i].Controls)
+                {
+                    if (tables[i].GetPositionFromControl(cell).Column != 0) continue;
+                    int wide = cell.GetPreferredSize(Size.Empty).Width + cell.Margin.Left + Px(18);
+                    if (first[i] == null || wide > natural[i])
+                    {
+                        first[i] = cell;
+                        natural[i] = wide;
+                    }
+                }
+                widest = Math.Max(widest, natural[i]);
+            }
+            // A label widened before, no longer the widest, given its own gap back.
+            for (int i = 0; i < tables.Length; i++)
+                foreach (Control cell in tables[i].Controls)
+                    if (cell != first[i] && tables[i].GetPositionFromControl(cell).Column == 0 && cell.Margin.Right != Px(18))
+                        cell.Margin = new Padding(cell.Margin.Left, cell.Margin.Top, Px(18), cell.Margin.Bottom);
+            for (int i = 0; i < tables.Length; i++)
+            {
+                if (first[i] == null) continue;
+                Padding gap = first[i].Margin;
+                // A table whose values would wrap beside the shared column keeps its own (the layout audit: a Turkish
+                // watcher in trouble, recovery paused, grew Right now by a line) - the Overview never moves for alignment.
+                int extra = widest - natural[i];
+                if (extra > 0 && !ValuesFit(tables[i], widest)) extra = 0;
+                int right = Px(18) + extra;
+                if (gap.Right != right) first[i].Margin = new Padding(gap.Left, gap.Top, right, gap.Bottom);
+            }
+        }
+
+        // Whether every value of `table` stays on its one line with its label column `column` wide.
+        private static bool ValuesFit(TableLayoutPanel table, int column)
+        {
+            int room = table.ClientSize.Width - column;
+            if (table.ClientSize.Width <= 0) return true;
+            foreach (Control cell in table.Controls)
+                if (table.GetPositionFromControl(cell).Column == 1 &&
+                    cell.GetPreferredSize(Size.Empty).Width + cell.Margin.Horizontal > room)
+                    return false;
+            return true;
         }
 
         private TableLayoutPanel Facts(TableLayoutPanel card)

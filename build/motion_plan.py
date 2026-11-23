@@ -10,7 +10,7 @@ A plan is JSON:
 
     {"format": "car-motion/1", "name": "readme-en", "output": "docs/images/readme-motion.png",
      "scenes_from": "readme-scenes.json", "values": {"first": "en", "second": "ko"},
-     "light_step_ms": 33, "length": [25000, 35000], "budget": {"cap": 9000000},
+     "light_step_ms": 33, "length": [25000, 35000], "budget": {"cap": 12000000},
      ...the canvas, the window, the taskbar and the card (make_motion.py reads those)...}
 
 `scenes` (or the file `scenes_from` names, beside it) is a list of {"id", "steps"}. A `${name}` anywhere in the scenes
@@ -20,17 +20,27 @@ is replaced by `values[name]`, so one storyboard serves both READMEs. Each step 
     {"set": {...}, "hold": ms}                     a cut: the window's state changes at once
     {"move": target, "frames": n, "step": ms}      the pointer travels to `target`, eased (brand.ease)
     {"hover": target, "frames": n, "step": ms}     the target shows its hover face
-    {"press": target, "frames": n, "step": ms}     ...its pressed face, and a ripple where the pointer is
+    {"press": target, "frames": n, "step": ms}     ...its pressed face, and a ripple where the pointer is; as it goes
+                                                   down a press on `tray.icon` takes the icon's hover card away and a
+                                                   press anywhere but on the popup closes it (v0.6.26)
     {"card": "enter" | "shown" | "leave", "frames": n, "step": ms}   ("shown": already at rest)
     {"wheel": notches, "frames": n, "step": ms}    the page scrolls as SoftPage glides it
     {"wheel": 1, "on": "explain", ...}             the same turn over Pending's Why it is waiting, which scrolls its
                                                    checks on a soft page of its own
-    {"open": "setting.<field>", "frames": n, "step": ms, "hold": ms}   the field's drop list fades in, then holds
+    {"open": "setting.<field>", "frames": n, "step": ms, "hold": ms}   a press on the field: its drop list opens as the
+                                                   button goes down (SoftCombo: WM_LBUTTONDOWN), a ripple where the
+                                                   pointer is, the list fading in, then holds
     {"rows": [value, ...], "step": ms}             the pointer's row in the open list, one after another
-    {"choose": value, "hold": ms}                  the list closes with `value` shown (not saved)
+    {"choose": value, "hold": ms}                  the list closes with `value` shown (not saved), its last picture
+                                                   fading out over brand's press time (SoftDropList.FadeOut)
     {"right": "task.<n>", "frames": n, "step": ms, "hold": ms}   a right click on a Pending row: it is chosen, a
-                                                   ripple where the pointer is, and the row's own menu opens there
-    {"dismiss": "menu", "hold": ms}                the menu closes with nothing chosen (Escape)
+                                                   ripple where the pointer is, and the row's own menu opens there,
+                                                   fading in and rising into place over brand's transition
+    {"dismiss": "menu", "hold": ms}                the menu closes with nothing chosen (Escape), its last picture
+                                                   fading out over brand's press time (SoftLayerFade)
+    {"dialog": {"kind": "timeline"}, "hold": ms}   the window opens a dialog over itself: it fades in over brand's
+                                                   transition, the veil under it with it (SoftDialog.FadeStep); it
+                                                   closes with a cut, {"set": {"dialog": null}}
     {"popup": "open" | "close", "hold": ms}        the notification-area popup is shown, or hidden at once (SW_HIDE).
     {"popup": "open", "frames": n, "step": ms}     it opens as the product opens it (v0.6.23: it fades in over brand's
                                                    transition and rises SPACING xs into place, ui.popup.motion.opening),
@@ -44,6 +54,16 @@ is replaced by `values[name]`, so one storyboard serves both READMEs. Each step 
                                                    is drawn half faded while the control layer's answer is awaited
     {"switch": row, "to": "off" | "on", "frames": n, "step": ms}   the answer came: the switch glides to its new place
                                                    (ui.popup.motion.glide_amount, brand's transition time and curve)
+
+v0.6.26 (audit-apng M3-M7): what opens and closes on its own timer - the row menu, a drop-down's list, a dialog - gets a
+frame every FADE_STEP ms of its fade (`opening_moments`, `closing_moments`), each told how far into it it is
+(`appear_ms`, `close_ms`), the plan's hold after it shortened by nothing: the fade is in the picture's time. An
+action's answer (`answered`: "retry-now") is a state the window takes as it takes the reply, its note and all. A glide
+of a control's face - hover, press, the current tab, busy, the light's colour on Pause, the setup bar and its closing
+fill - is drawn at each frame's moment (v0.6.26, audit-apng M6): every frame tells the window its moment on the
+picture's clock (motion_window.frame_state's `moment`), a control's change begins its glide at the frame it comes in,
+and every frame after draws it there (Transition.RenderMs, the setup bar's InstallerBar.RenderAt) - the frames the
+lights already add every `light_step_ms` show it on its way.
 
 A target is a name the window answers with bounds (`page.<name>`, `section.<name>`, `save`, `setting.<field>`,
 `row.<value>` in an open drop list, `task.<n>` - the Pending list's row n - `menu.<n>` - item n of the open row
@@ -86,13 +106,15 @@ PLANS = HERE / "motion"
 
 # The window state a frame may set (gui/WindowRender.cs reads exactly these).
 STATE_KEYS = ("locale", "page", "section", "scroll", "hover", "pressed", "combo", "droplist", "selected", "menu",
-              "busy", "variant", "explain", "dialog", "sweep")
+              "busy", "variant", "explain", "dialog", "sweep", "answered")
+# The actions whose answer a frame may say came (`answered`, v0.6.26): the window takes each as it takes the reply.
+ANSWERED = ("retry-now",)
 PAGES = ("overview", "pending", "history", "statistics", "diagnostics", "settings")
 SECTIONS = ("general", "recovery", "continuation", "appearance", "advanced")
 STEPS = ("hold", "set", "move", "hover", "press", "card", "wheel", "open", "rows", "choose", "right", "dismiss",
-         "popup", "ask", "switch", "tip")
+         "popup", "ask", "switch", "tip", "dialog")
 # The steps that may say how long their one frame holds.
-HOLDING = ("set", "open", "choose", "right", "dismiss", "popup", "tip")
+HOLDING = ("set", "open", "choose", "right", "dismiss", "popup", "tip", "dialog")
 # The shortest a frame is held, in ms: the product's own quickest step (a scroll's glide and a drop list's fade tick
 # every 15 ms, the card's every 16). Delays are whole milliseconds, exact; browsers show 10 ms or less as 100 ms.
 SHORTEST = 15
@@ -100,6 +122,8 @@ SHORTEST = 15
 # rectangles of SHORTEST each (motion_apng.patches) - a light at the top of the picture and the
 # tray icon at its bottom - rather than one round both.
 CLOSEST = 2 * SHORTEST
+# A fade's own timer, in ms (Motion.Interval): what the row menu, a drop-down's list and a dialog step their fades by.
+FADE_STEP = SHORTEST
 # How long a click's ripple lasts (TOOLING 2.3), in ms.
 RIPPLE_MS = 240
 # How long the status light's sweep lasts, in ms (gui/Marks.cs HaloDot.SweepMs: its arc, then the second ring's whole
@@ -233,6 +257,10 @@ def check(plan: dict) -> None:
                 raise PlanError("%s: only the row menu is dismissed, not %r" % (name, step["dismiss"]))
             if "set" in step:
                 _check_state(name, step["set"])
+            if "dialog" in step:
+                if not isinstance(step["dialog"], dict):
+                    raise PlanError("%s: a dialog opens with a step and closes with a set: %r" % (name, step))
+                _check_state(name, {"dialog": step["dialog"]})
     if "clock_step_ms" in plan and plan["clock_step_ms"] != WINDOW_CLOCK_MS:
         raise PlanError("the window's clock ticks every %d ms, not %r" % (WINDOW_CLOCK_MS, plan["clock_step_ms"]))
     run = _walk(plan)
@@ -266,6 +294,8 @@ def _check_state(scene: str, state: dict) -> None:
                                             or state["dialog"].get("kind") != "timeline"
                                             or state["dialog"].get("list", "pending") not in ("pending", "history")):
         raise PlanError("%s: the window opens the Timeline from Pending or History: %r" % (scene, state["dialog"]))
+    if state.get("answered") not in (None,) + ANSWERED:
+        raise PlanError("%s: the window takes no answer of %r" % (scene, state["answered"]))
     if state.get("sweep") not in (None,) + SWEEPS:
         raise PlanError("%s: the light sweeps as the window opens or as it turns on, not %r" % (scene, state["sweep"]))
     if "page" in state and state["page"] not in PAGES:
@@ -291,6 +321,8 @@ class _Run:
         self.tip = None
         self.frames = []
         self.scene = ""
+        # The control a press left its hover on (`_after_press`), or None.
+        self.kept = None
 
     def emit(self, at=None):
         at = self.t if at is None else at
@@ -333,6 +365,34 @@ def _clear_faces(run):
         run.window.pop(kind, None)
         if run.card is not None:
             run.card[kind] = None
+    run.kept = None
+
+
+# v0.6.26 (review P3): the window's controls whose hover a click leaves where it is - the pointer still rests on them, so no
+# MouseLeave comes (SoftButton.Hover, NavButton) - as named targets (motion_compose.locate puts the pointer on them); and
+# among them those that stay where they are when the page changes: the tabs, Settings' sections and the setup window's one
+# primary button (InstallerWindow's `forward`, on every page).
+KEPT_AFTER_PRESS = re.compile(r"(page\.|section\.|setting\.|save\Z|restore\Z|pending\.(retry|timeline)\Z"
+                              r"|overview\.toggle\Z|button\.forward\Z)")
+KEPT_OVER_PAGES = re.compile(r"(page\.|section\.|button\.forward\Z)")
+
+
+def _after_press(run, target):
+    """The faces once a press on `target` is let go: the press gone; the hover where the pointer still rests - on a control of
+    the window that keeps it (KEPT_AFTER_PRESS) - until the pointer moves, the page changes under it (not for a control that
+    stays, KEPT_OVER_PAGES), or the window is opened again; everything else as before, cleared."""
+    keep = isinstance(target, str) and KEPT_AFTER_PRESS.match(target) is not None
+    _clear_faces(run)
+    if keep:
+        run.window["hover"] = target
+        run.kept = target
+
+
+def _leave_kept(run):
+    """The pointer has left the control it pressed (it moves on): the hover kept after the press goes."""
+    if run.kept is not None and run.window.get("hover") == run.kept:
+        run.window.pop("hover", None)
+    run.kept = None
 
 
 def _walk(plan: dict) -> _Run:
@@ -363,10 +423,18 @@ def _step(run, step):
         # opens again in another language has chosen nothing.
         if ("page" in state and state["page"] != "pending") or "locale" in state:
             run.window.pop("selected", None)
+        # An answer is taken once (WindowRender.RenderAnswered): another page, language or state of the installation
+        # leaves it behind, its note staying where the window keeps it.
+        if ("page" in state and state["page"] != run.window.get("page")) or "locale" in state or "variant" in state:
+            run.window.pop("answered", None)
         if ("page" in state or "section" in state or "locale" in state) and "scroll" not in state:
             run.window.pop("scroll", None)
         if "page" in state and state["page"] != run.window.get("page") and "explain" not in state:
             run.window.pop("explain", None)
+        # v0.6.26 (review P3): a hover a press kept goes with the page it stood on, and with a window opened again.
+        if run.kept is not None and (("page" in state and state["page"] != run.window.get("page")
+                                      and not KEPT_OVER_PAGES.match(run.kept)) or "locale" in state):
+            _leave_kept(run)
         for key, value in state.items():
             if value is None:
                 run.window.pop(key, None)
@@ -389,6 +457,7 @@ def _step(run, step):
         run.t += int(step["hold"])
         return
     if "move" in step:
+        _leave_kept(run)
         count, gap = run.frames_of(step, 10)
         start = run.resting()[1]
         target = step["move"]
@@ -411,11 +480,18 @@ def _step(run, step):
         if kind == "pressed":
             _set_face(run, "pressed", target)
             run.ripple = (_frozen(run.resting()[1]), run.t)
+            # v0.6.26 (audit-apng M8): as the button goes down, not as it comes up. The icon's hover card goes at once on
+            # the icon's WM_LBUTTONDOWN (ui/tray/icon.py: _hide_tip, before NIN_SELECT opens the popup); the popup goes on
+            # a press anywhere but on itself, which takes the activation from it (ui/popup/messages.py: WA_INACTIVE).
+            if target == "tray.icon" and run.tip is not None:
+                _hide_tip(run)
+            if run.popup is not None and not (isinstance(target, str) and target.startswith("popup.")):
+                run.popup = None
         for index in range(count):
             run.emit(run.t + index * gap)
         run.t += count * gap
         if kind == "pressed":
-            _clear_faces(run)
+            _after_press(run, target)
         return
     if "card" in step:
         count, gap = run.frames_of(step, 9)
@@ -451,6 +527,9 @@ def _step(run, step):
         if not field.startswith("setting."):
             raise PlanError("%s: only a setting's drop-down opens a list, not %r" % (run.scene, field))
         _clear_faces(run)
+        # v0.6.26 (audit-apng M5): it opens as the button goes down, so the press's ripple starts with it.
+        run.pointer = run.resting()
+        run.ripple = (_frozen(run.resting()[1]), run.t)
         # It fades in and rises into place as SoftDropList.Show animates it: a frame every `step` ms of that, the
         # list `appear_ms` into it, then at rest.
         count, gap = run.frames_of(step, 0, SHORTEST)
@@ -480,7 +559,14 @@ def _step(run, step):
         combo = dict(run.window.get("combo") or {})
         combo[listed["field"]] = step["choose"]
         run.window["combo"] = combo
-        run.pointer = ("at", "setting." + listed["field"])
+        # v0.6.26 (audit-apng M5): the value is shown at once and the list's last picture fades out (SoftDropList.FadeOut),
+        # the pointer where it pressed - on the row it chose - not jumped back to the field.
+        run.pointer = run.resting()
+        for offset in closing_moments():
+            run.window["droplist"] = dict(listed, close_ms=offset)
+            run.emit(run.t + offset)
+        run.window.pop("droplist", None)
+        run.t += closing_length()
         run.emit()
         run.t += int(step.get("hold", 40))
         return
@@ -496,6 +582,11 @@ def _step(run, step):
         for index in range(count):
             run.emit(run.t + index * gap)
         run.t += count * gap
+        # v0.6.26 (audit-apng M4): it fades in and rises into place (SoftMenuLayer.Open, Tick), then stands at rest.
+        for offset in opening_moments():
+            run.window["menu"] = {"at": target, "appear_ms": offset}
+            run.emit(run.t + offset)
+        run.t += opening_length()
         run.window["menu"] = {"at": target}
         run.emit()
         run.t += int(step.get("hold", 40))
@@ -503,10 +594,31 @@ def _step(run, step):
     if "dismiss" in step:
         if "menu" not in run.window:
             raise PlanError("%s: no menu is open to dismiss" % run.scene)
-        run.window.pop("menu")
+        # v0.6.26 (audit-apng M4): its last picture - its item in hand still lit - fades out where it stood (SoftLayerFade).
+        opened = dict(run.window.pop("menu"))
+        opened.pop("appear_ms", None)
+        run.pointer = run.resting()
+        for offset in closing_moments():
+            run.window["menu"] = dict(opened, close_ms=offset)
+            run.emit(run.t + offset)
+        run.window.pop("menu", None)
         if str(run.window.get("hover", "")).startswith("menu."):
             run.window.pop("hover")
+        run.t += closing_length()
+        run.emit()
+        run.t += int(step.get("hold", 40))
+        return
+    if "dialog" in step:
+        # v0.6.26 (audit-apng M3): the window opens a dialog over itself; it fades in once painted (SoftDialog.OpenFade,
+        # FadeStep), the veil under it with it, then stands at rest.
+        _clear_faces(run)
         run.pointer = run.resting()
+        state = copy.deepcopy(step["dialog"])
+        for offset in opening_moments():
+            run.window["dialog"] = dict(state, appear_ms=offset)
+            run.emit(run.t + offset)
+        run.t += opening_length()
+        run.window["dialog"] = state
         run.emit()
         run.t += int(step.get("hold", 40))
         return
@@ -528,12 +640,9 @@ def _step(run, step):
             if run.popup is not None:
                 raise PlanError("%s: the popup is open already" % run.scene)
             if run.tip is not None:
-                # A click hides the icon's card at once as the popup comes (tray/clicks.py _select): the frames it was
-                # on screen for are told when that was, which is what its countdown reads against.
-                until = run.t
-                run.frames = [frame._replace(tip=_frozen(dict(dict(frame.tip), until=until))) if frame.tip else frame
-                              for frame in run.frames]
-                run.tip = None
+                # A click hides the icon's card at once as the popup comes (tray/clicks.py _select) - a press on the
+                # icon already has (the `press` step) - and the frames it was on screen for are told when.
+                _hide_tip(run)
             run.popup = {"opened": run.t, "off": [], "busy": [], "glides": {}}
         elif step["popup"] == "close":
             if run.popup is None:
@@ -567,6 +676,39 @@ def _step(run, step):
         run.t += count * gap
         return
     raise PlanError("%s: no step does %r" % (run.scene, step))
+
+
+def opening_moments() -> list:
+    """The moments, in ms from its start, of a fade-in's frames (the row menu, a drop-down's list, a dialog): a step of
+    the fade's own timer (FADE_STEP) each until brand's transition is over - 0, 15, ... 150."""
+    from codex_auto_resume import brand
+    return list(range(0, int(brand.MOTION["transition_ms"]), FADE_STEP))
+
+
+def opening_length() -> int:
+    """How long a fade-in takes in the picture, in ms: its last step's tick, where it stands at rest."""
+    return len(opening_moments()) * FADE_STEP
+
+
+def closing_moments() -> list:
+    """The moments, in ms from its start, of a fade-out's frames (a closed menu's or list's last picture): a step of its
+    timer each until brand's press time is over - 0, 15, ... 75."""
+    from codex_auto_resume import brand
+    return list(range(0, int(brand.MOTION["press_ms"]), FADE_STEP))
+
+
+def closing_length() -> int:
+    """How long a fade-out takes in the picture, in ms: its last step's tick, where it is gone."""
+    return len(closing_moments()) * FADE_STEP
+
+
+def _hide_tip(run):
+    """The icon's hover card goes at once, now: the frames it was on screen for are told when (`until`), which is what its
+    countdown reads against."""
+    until = run.t
+    run.frames = [frame._replace(tip=_frozen(dict(dict(frame.tip), until=until))) if frame.tip else frame
+                  for frame in run.frames]
+    run.tip = None
 
 
 def _held_frames(run, step):
@@ -685,6 +827,17 @@ def delays(moments: list, end: int) -> list:
                             % (moments[index], delay, SHORTEST))
         out.append(delay)
     return out
+
+
+def is_cut(before, frame: Frame) -> bool:
+    """Whether `frame` is a cut after the frame `before` it (None: the first): a change of the state the product paints in
+    one go - the window's, the card's, the popup's or its hover card's - which the picture then writes as one rectangle
+    (motion_apng.assemble's `whole`, v0.6.26 audit M1). A frame only the clock moves on - a light, the tray icon, a
+    sweep, a fade - and one only the pointer or a ripple moves in, is not: what moves there moves by itself."""
+    if before is None:
+        return True
+    return (before.window != frame.window or before.card != frame.card or before.popup != frame.popup
+            or before.tip != frame.tip)
 
 
 def window_states(frames: list) -> list:

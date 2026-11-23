@@ -940,8 +940,10 @@ class Runtime:
             flying = [handed(rule) for rule in self.state.messages_in_flight()]
             flying += [continued.handed(row) for row in self.state.continuations_in_flight()]
             flying += [promptqueue.handed(row) for row in self.state.prompts_in_flight()]
-            # v0.6.19: and the chat's messages in flight, each taken back once three minutes pass untaken.
-            flying += [chat.watched(row, self.clock()) for row in self.state.chats_in_flight()]
+            # v0.6.19: and the chat's messages in flight, each taken back once three minutes pass untaken - but (v0.6.26,
+            # M1) none in a queue the forced stop paused, which its conversation's continuations say.
+            flying += [chat.watched(row, self.clock(), self.state.continuations(thread_id=row["thread_id"], pending=None))
+                       for row in self.state.chats_in_flight()]
         except StateError:
             flying = []
         # P2's eight (v0.6.15-beta): those in flight first, the longest in flight first, from a place that moves on

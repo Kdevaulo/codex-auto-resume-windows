@@ -113,9 +113,12 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(english["output"], "docs/images/install-motion.png")
         self.assertEqual(korean["output"], "docs/images/install-motion-ko.png")
         self.assertEqual((english["locale"], korean["locale"]), ("en", "ko"))
-        same = {key: value for key, value in english.items() if key not in ("name", "output", "locale")}
-        other = {key: value for key, value in korean.items() if key not in ("name", "output", "locale")}
+        # v0.6.26 (audit-apng M9): each framed by its own language's still, and alike in everything else.
+        same = {key: value for key, value in english.items() if key not in ("name", "output", "locale", "window")}
+        other = {key: value for key, value in korean.items() if key not in ("name", "output", "locale", "window")}
         self.assertEqual(same, other)
+        self.assertEqual((english["window"], korean["window"]),
+                         ({"still": dict(motion.FIDELITY)["en"]}, {"still": dict(motion.FIDELITY)["ko"]}))
         self.assertEqual(sorted(path.name for path in motion.PLANS.glob("install-*.json")),
                          ["install-en.json", "install-ko.json", "install-scenes.json"])
         for name in ("README.md", "README.ko.md", "docs/GUIDE.md", "docs/GUIDE.ko.md"):
@@ -155,7 +158,8 @@ class PlanTests(unittest.TestCase):
                 canvas = plan["canvas"]
                 self.assertEqual((canvas["transparent"], canvas["shadow"], canvas["theme"], canvas["design"]),
                                  (True, False, "light", "soft"))
-                self.assertEqual(plan["window"]["still"], dict(motion.FIDELITY)["en"])
+                # v0.6.26 (audit-apng M9): framed by the still of its own language.
+                self.assertEqual(plan["window"]["still"], dict(motion.FIDELITY)[plan["locale"]])
                 self.assertLessEqual(plan["budget"]["cap"], 9000000)
 
     def test_the_scenes_walk_the_pages_in_the_windows_order(self):

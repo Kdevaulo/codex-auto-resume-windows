@@ -259,6 +259,23 @@ class UsageReading(TypedDict):
     windows: list[UsageWindow]
 
 
+class UnknownError(TypedDict):
+    """An error code Codex reported that this version does not know (v0.6.26): the newest, and how many in a day."""
+    code: str
+    count: int
+
+
+class SelfCheck(TypedDict):
+    """What the watcher's own judge says (v0.6.26, domain/public.py): that recovery cannot work here - a WORDS word -
+    the newest error code Codex reported that this version does not know, and Codex's version where it runs in a
+    layout this version has not been tested on. Each None where it says nothing."""
+    blocked: str | None
+    unknown_error: UnknownError | None
+    layout_untested: str | None
+    # v0.6.26 (#11): the version of this product it was updated from, while no look since has paired a server.
+    updated_from: str | None
+
+
 class WatcherView(TypedDict):
     """What is known of the watcher: its heartbeat, and whether it is there to beat."""
     running: bool | None
@@ -279,6 +296,8 @@ class WatcherView(TypedDict):
     # None and None for one that runs, or of which nothing can be said.
     ended: str | None
     ended_at: float | None
+    # v0.6.26: what the running watcher's judge of its own looks says, or None (domain/public.self_check).
+    self_check: SelfCheck | None
 
 
 class PowerArmed(TypedDict):

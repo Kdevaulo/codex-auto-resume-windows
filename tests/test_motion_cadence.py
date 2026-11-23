@@ -93,9 +93,12 @@ class ReadmeCadenceTests(unittest.TestCase):
                 self.assertLessEqual(plan["ripple_step"], POINTER_STEP)
 
     def test_the_budget_is_a_generous_ceiling_and_no_target(self):
+        """A ceiling, never a target (quality before size, the owner 2026-10-18): 9 MB until v0.6.26, when every glide drawn
+        at its frame's moment (audit-apng M6) made the README motion 9.7 MB; the ceiling is our own (GitHub documents no
+        size limit for a repository's own picture below its 100 MB file limit), so it rose to 12 MB rather than a frame going."""
         for plan in self.plans():
             with self.subTest(plan["name"]):
-                self.assertEqual(plan["budget"], {"cap": 9000000})
+                self.assertEqual(plan["budget"], {"cap": 12000000})
 
 
 class CardCadenceTests(unittest.TestCase):

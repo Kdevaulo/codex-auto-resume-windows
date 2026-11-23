@@ -48,12 +48,12 @@ START_WORD = "resident_started"
 GAVE_UP_WORD = "gave_up"
 # What each capability counts, as its journal says it: the resident started, and given up on for the hour; the API's
 # server started or stopped, its port taken, and closed for five minutes after ten wrong tokens in a minute. The actions
-# it carried out.
-API_CODES = (START_WORD, GAVE_UP_WORD, "started", "stopped", "port_taken", "locked")
+# it carried out. v0.6.26 (O2): "unreadable", a run of failed reads of the states the resident kept running through.
+API_CODES = (START_WORD, GAVE_UP_WORD, "started", "stopped", "port_taken", "locked", "unreadable")
 API_ACTION_CODES = ("paused", "cancelled", "list_again")
 # Telegram's: the resident's two, its long poll started or stopped, and each command it carried out or what it ignored.
 TELEGRAM_CODES = (START_WORD, GAVE_UP_WORD, "started", "stopped", "status", "listed", "cancelled", "paused", "list_again",
-                  "ignored")
+                  "ignored", "unreadable")
 TELEGRAM_CONTINUE_CODES = ("continued", "pause_lifted")
 
 

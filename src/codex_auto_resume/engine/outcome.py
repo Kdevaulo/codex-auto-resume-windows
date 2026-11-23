@@ -8,6 +8,7 @@ from __future__ import annotations
 from .. import failures, machine
 from ..machine import OBSERVING, TERMINAL, WAITING, WATCHED
 from ..domain.states import BOOT_MARGIN, ended_by_boot
+from .impossible import usage_reason
 
 
 class OutcomeMixin:
@@ -151,6 +152,8 @@ class OutcomeMixin:
                 return
         wait = (max(60, probe_reset + self.options["reset_grace_seconds"] - now) if probe_reset
                 else self.options["conservative_poll_seconds"])
+        # v0.6.26: and a read that said neither says which way it broke, where the helper's last answer names it.
         self.transition(row, "waiting_for_usage",
-                        "usage_unavailable" if available is False else "usage_unknown",
+                        "usage_unavailable" if available is False
+                        else usage_reason(limits, getattr(self.backend, "protocol_results", None)),
                         delay=wait, **extra)

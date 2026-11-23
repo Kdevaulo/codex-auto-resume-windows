@@ -57,7 +57,8 @@ class ReadmePlanTests(unittest.TestCase):
             with self.subTest(name):
                 plan = motion_plan.load(make_motion.plan_path(name))
                 frames = motion_plan.expand(plan)
-                self.assertEqual(state(frames[-1]), {"page": "overview", "locale": second})
+                # v0.6.26 (review P3): the last click was Resume, and the pointer still rests on it: its hover stays.
+                self.assertEqual(state(frames[-1]), {"page": "overview", "locale": second, "hover": "overview.toggle"})
                 self.assertIn(("combo", (("interface_language", second),)),
                               [item for frame in frames for item in frame.window],
                               "the language is chosen in the drop list before Save")
@@ -202,7 +203,10 @@ class StepTests(unittest.TestCase):
         self.assertEqual([item["hover"] for item in lists[2:5]], ["system", "en", "ko"])
         self.assertEqual([frame.pointer for frame in frames[2:5]], [("at", "row.system"), ("at", "row.en"),
                                                                    ("at", "row.ko")])
-        self.assertIsNone(lists[5])
+        # v0.6.26 (audit-apng M5): the list's last picture fades out, the value shown from its first frame.
+        closing = len(motion_plan.closing_moments())
+        self.assertEqual([item["close_ms"] for item in lists[5:5 + closing]], motion_plan.closing_moments())
+        self.assertIsNone(lists[5 + closing])
         self.assertEqual(state(frames[5])["combo"], {"interface_language": "ko"})
 
     def test_a_later_state_at_the_same_moment_is_the_one_shown(self):
@@ -285,7 +289,7 @@ class RunnerTests(unittest.TestCase):
                                                                                  "hold": 200},
                        light_step_ms=100)
         drawn = list(make_motion.run(plan, lambda frame: state(frame)["page"].encode()))
-        self.assertEqual([(delay, picture) for delay, _scene, picture in drawn],
+        self.assertEqual([(delay, picture) for delay, _scene, picture, _whole in drawn],
                          [(300, b"overview"), (300, b"pending"), (200, b"overview")])
 
     def test_the_dry_run_names_every_scene(self):

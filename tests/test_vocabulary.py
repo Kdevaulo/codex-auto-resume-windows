@@ -75,7 +75,9 @@ LISTS = {
     # off, left inProgress for good (engine/outcome.py).
     # 2026-10-22: progress_then_user_joined - a recovery turn that did work before a person's message entered it.
     # #58's follow-up: app_server_unmatched - the Codex app runs and no server of its could be matched.
-    "machine.REASONS": ("set", 82, "621ae6fdcfaa1fba"),
+    # v0.6.26: usage_probe_broken_answer, _request and _start - which way a usage read broke - and
+    # app_server_unmatched:named_engine - the engine set in Settings is not the one the app runs.
+    "machine.REASONS": ("set", 86, "72b0809747221b10"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -88,7 +90,8 @@ LISTS = {
     "machine.PAGES": ("tuple", 6, "ffad1c9f0521398d"),
     # v0.6.11: `held`, a record that waits for a person (schema 4's hold).
     # #58's follow-up: app_server_unmatched, the record's own reason, which asks for a person.
-    "machine.OVERLAYS": ("tuple", 9, "d18ea9845d73daec"),
+    # v0.6.26: codex_changed, the watcher's own judge finding that recovery cannot work here (engine/impossible.py).
+    "machine.OVERLAYS": ("tuple", 10, "12eea985b622ea1a"),
     "machine.GATE_RESULTS": ("set", 4, "9a50f41ff116a706"),
     "machine.GATES": ("tuple", 13, "547089c399324718"),
     # v0.6.11: `held`, a gate core passed and the edition's plug held (domain/plug.py, HOLD);
@@ -103,7 +106,8 @@ LISTS = {
     # 2026-10-21: and progress_then_turn_cut_off, as every reason is.
     # 2026-10-22: and progress_then_user_joined, as every reason is.
     # #58's follow-up: and app_server_unmatched, as every reason is.
-    "machine.GATE_REASONS": ("set", 100, "5b944a9cd555cfdd"),
+    # v0.6.26: and the four of v0.6.26, as every reason is.
+    "machine.GATE_REASONS": ("set", 104, "5a3874920480b3f4"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -203,7 +207,8 @@ LISTS = {
     "windows.UNAVAILABLE": "UNAVAILABLE",
     "ui.tray.ICON_STATES": ("tuple", 5, "e94d5138669400b3"),
     "ui.popup.STATES": ("tuple", 6, "b38c816dbd792bf5"),
-    "ui.popup.ATTENTION_OVERLAYS": ("set", 5, "0e4a92183586541e"),
+    # v0.6.26: and codex_changed, which asks for a person as app_server_unmatched does.
+    "ui.popup.ATTENTION_OVERLAYS": ("set", 6, "65e3e7cb81914954"),
     # v0.6.11: and the needs-you notice's light, attention; and a long sleep's, paused (power.py).
     # and Show me what happens' card, waiting.
     # v0.6.16-beta.3: near_limit; v0.6.16: the forced stop's three notices near a limit, each a kind of its own.
@@ -585,7 +590,8 @@ class HomeTests(unittest.TestCase):
     def test_a_members_name_is_its_value_in_capitals(self):
         for cls, member in members():
             with self.subTest(vocabulary=cls.__name__, member=member.value):
-                self.assertEqual(member.name, member.value.upper().replace("-", "_"))
+                # v0.6.26: and a colon, which names a kind of a reason ("app_server_unmatched:named_engine").
+                self.assertEqual(member.name, member.value.upper().replace("-", "_").replace(":", "_"))
 
     def test_no_word_is_two_members(self):
         for cls in enums():

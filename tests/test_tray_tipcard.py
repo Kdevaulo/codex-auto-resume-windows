@@ -70,12 +70,17 @@ class PartsTests(unittest.TestCase):
                         parts = words.tooltip_parts(FIXTURES[name], strings, NOW, edition)
                         joined = words.tooltip_joined(parts)
                         tip = words.tooltip(FIXTURES[name], strings, NOW, edition)
-                        self.assertEqual(joined[:words.TIP_CHARS - 1] if parts["line"] else joined, tip)
+                        # What fits szTip whole is the join; what does not has its last meter rows left out (v0.6.26).
+                        self.assertTrue(joined.startswith(tip) or not parts["line"], tip)
+                        if len(joined) < words.TIP_CHARS or not parts["line"]:
+                            self.assertEqual(joined, tip)
 
     def test_the_card_is_never_cut_short_where_sztip_is(self):
         long = dict(FIXTURES["metered"], advanced={"meter": {"windows": [{"window_minutes": 300, "used_percent": 10}] * 12}})
         parts = words.tooltip_parts(long, EN, NOW, "advanced")
-        self.assertEqual(len(words.tooltip(long, EN, NOW, "advanced")), words.TIP_CHARS - 1)
+        tip = words.tooltip(long, EN, NOW, "advanced")
+        self.assertLess(len(tip), words.TIP_CHARS)
+        self.assertTrue(tip.endswith("5-hour 90% left"), "the rows that fit are whole: " + tip)
         self.assertGreater(len(words.tooltip_joined(parts)), words.TIP_CHARS)
         self.assertEqual(len(parts["meter"]), 12)
 

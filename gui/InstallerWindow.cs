@@ -1810,8 +1810,11 @@ namespace CodexAutoResume
     ///
     /// Two values: Value, where the work is, and Shown, what is drawn. Shown glides up to Value on a timer
     /// (InstallerProgress.Glide) and stops it once there; neither ever goes back. Nothing glides under a capture
-    /// (Soft.StillReady: the pictures and the install motion stay exact) or where it cannot be seen; with motion
-    /// reduced the bar jumps, and redraws at most about once a second.
+    /// (Soft.StillReady: the pictures stay exact) or where it cannot be seen; with motion reduced the bar jumps, and
+    /// redraws at most about once a second. v0.6.26 (audit-apng M6): in a picture's frames (Transition.RenderMs, the
+    /// install motion) it glides on the picture's clock instead of its timer - each of its timer's steps taken in turn up
+    /// to the frame's moment (RenderAt), and the run's end filled for its FinishSeconds before the Finish page - so the
+    /// picture shows it moving as the window moves it.
     internal sealed class InstallerBar : Control
     {
         private double value, shown;
@@ -1854,7 +1857,21 @@ namespace CodexAutoResume
         internal double Shown { get { return shown; } }
 
         /// Whether the bar's timer runs: only while what it draws has somewhere left to go.
-        internal bool Moving { get { return timer.Enabled; } }
+        internal bool Moving { get { return timer.Enabled || rendered; } }
+
+        // v0.6.26 (audit-apng M6): on a picture's clock, whether it is on its way (its timer never runs then).
+        private bool rendered;
+
+        // The moment a clock-driven step reads: the picture's (Transition.RenderMs) in a picture's frames, else its own clock.
+        private long Now { get { return Transition.RenderMs >= 0 ? (long)Transition.RenderMs : clock.ElapsedMilliseconds; } }
+
+        /// v0.6.26 (audit-apng M6): the bar at the picture's moment `ms`: every step its timer would have taken since the last
+        /// - one each GlideInterval - taken in turn, each as Tick takes it, and the run's end (Finish) let go once its fill
+        /// is over. Only in a picture's frames.
+        internal void RenderAt(double ms)
+        {
+            while (rendered && lastTick + GlideInterval <= ms) TickAt(lastTick + GlideInterval);
+        }
 
         /// The run ended well: the bar goes to the whole of it - a short glide, at most FinishSeconds, where it may
         /// move - and then `then` runs, at once where it may not.
@@ -1869,7 +1886,7 @@ namespace CodexAutoResume
                 return;
             }
             finished = then;
-            finishStarted = clock.ElapsedMilliseconds;
+            finishStarted = Now;
             Run(GlideInterval);
         }
 
@@ -1886,6 +1903,8 @@ namespace CodexAutoResume
         // How the bar may move now.
         private Moves Mode()
         {
+            // In a picture's frames: gliding, as a person with Windows' animations on sees it, at once where set up arrived.
+            if (Transition.RenderMs != Transition.Live) return Transition.RenderMs >= 0 ? Moves.Glide : Moves.None;
             Form form = FindForm();
             bool seen = IsHandleCreated && Visible && Soft.Shown(this) &&
                         (form == null || (form.Visible && form.WindowState != FormWindowState.Minimized));
@@ -1914,6 +1933,13 @@ namespace CodexAutoResume
 
         private void Run(int interval)
         {
+            if (Transition.RenderMs >= 0)
+            {
+                if (rendered) return;
+                rendered = true;
+                lastTick = Now;
+                return;
+            }
             if (timer.Enabled && timer.Interval == interval) return;
             timer.Interval = interval;
             lastTick = clock.ElapsedMilliseconds;
@@ -1923,11 +1949,17 @@ namespace CodexAutoResume
         private void Halt()
         {
             timer.Stop();
+            rendered = false;
         }
 
         private void Tick()
         {
-            long now = clock.ElapsedMilliseconds;
+            TickAt(clock.ElapsedMilliseconds);
+        }
+
+        // One step of the glide at the moment `now`, in ms of the clock the bar runs on.
+        private void TickAt(long now)
+        {
             Moves mode = Mode();
             if (mode == Moves.Glide && !(finished != null && now - finishStarted >= (long)(InstallerProgress.FinishSeconds * 1000)))
                 Show(InstallerProgress.Glide(shown, value, (now - lastTick) / 1000.0));

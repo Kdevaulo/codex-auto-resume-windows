@@ -64,7 +64,7 @@
   GitHub에 닿지 못할 때 잘못 알려 주는 업데이트 상태([#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41))를 알렸고,
   사용량 한도가 풀린 뒤 목표를 다시 이어 가게 하는 수정([#49](https://github.com/songyb111-gachon/codex-auto-resume-windows/pull/49))과, Codex의 관리되는 데몬이 도는 곳에서 이어서 하기를 그 데몬으로 보내고
   영수증 없는 대기열 응답이 무엇이었는지 정해진 말로 남기는 수정([#53](https://github.com/songyb111-gachon/codex-auto-resume-windows/pull/53))을 보내 주셨습니다. 목표 이어서 하기가 한 대화의
-  상한에 닿은 뒤 사용량 한도가 풀려도 목표가 멈춘 채 남는 문제도 알려 주셨고, 감시기가 확인한 초기화는 그 상한에 세지 않는 수정을 제안해
+  상한에 닿은 뒤 사용량 한도가 풀려도 목표가 멈춘 채 남는 문제도 알려 주셨고, 워처가 확인한 초기화는 그 상한에 세지 않는 수정을 제안해
   주셨습니다([#59](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/59)).
 - [@weng-wen-jun](https://github.com/weng-wen-jun) 님은 오래된 대기 중 복구를 정리하는 수동 '다시 살펴보고 정리'를
   요청했고([#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)), 이어서 대기열 메시지를 위한 대기 중과 편집 창, 그리고 지금 다시 확인과 다시 살펴보기의

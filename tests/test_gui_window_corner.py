@@ -179,7 +179,7 @@ namespace CodexAutoResume
                             var zero = new byte[stride];
                             for (int y = 0; y < size.Height; y++) Marshal.Copy(zero, 0, new IntPtr(bits.ToInt64() + (long)y * stride), stride);
                             clock.Restart();
-                            WindowShape.Compose(edge, ground, line, Color.Black, new WindowShape.MemorySink(bits, stride));
+                            WindowShape.Compose(edge, ground, line, Color.Black, new WindowShape.MemorySink(bits, stride, size.Width, size.Height));
                             times.Add(clock.Elapsed.TotalMilliseconds);
                         }
                         finally { Marshal.FreeHGlobal(bits); }
@@ -423,7 +423,9 @@ class StillTests(unittest.TestCase):
         frames = guiscan.member_body("SettingsForm", "RenderFrames")
         self.assertIn('job.TryGetValue("edge_dpi", out edgeDpi)', frames)
         self.assertIn("using (Bitmap edged = CornerStill(picture, renderEdgeDpi))", frames)
-        self.assertIn("writer.Write(index, edged, form.RenderBounds(targets, frame));", frames)
+        self.assertIn("writer.Write(index, edged, form.RenderBounds(targets, frame), form.renderVeil);", frames)
+        # v0.6.26: a frame the motion lays in the chrome is cut before what lies over the window (RenderPicture, EdgeFirst).
+        self.assertIn("Bitmap edged = CornerStill(picture, renderEdgeDpi);", guiscan.member_body("SettingsForm", "RenderPicture"))
 
     def test_the_render_and_the_capture_cut_by_the_same_decision(self):
         frames = guiscan.member_body("SettingsForm", "RenderFrames")

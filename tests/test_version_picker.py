@@ -234,6 +234,10 @@ def kept(version, files=None):
     return "%s %s %s" % (version, str("-" in version).lower(), "|".join(files))
 
 
+# $PickMaxPages: twenty since v0.6.26 (five before, which the 150th release would have filled; see
+# tests/test_release_pages_many.py).
+MAX_PAGES = 20
+
 PAGE_CASES = {
     "one_short_page": ([("body", [entry("0.6.11"), entry("0.6.12-beta")], None)],
                        [kept("0.6.11"), kept("0.6.12-beta")], 1),
@@ -243,13 +247,14 @@ PAGE_CASES = {
                                      [kept("0.6.11"), kept("0.6.10")], 2),
     "a_full_page_then_an_empty_one": ([("body", junk(29) + [entry("0.6.11")], None), ("body", [], None)],
                                       [kept("0.6.11")], 2),
-    # Five full pages may not be all of it: never a sixth asked for, and never a part of the list
-    # taken for all of it, which would drop the oldest unsaid.
-    "never_a_sixth_page": ([("body", junk(29) + [entry("0.6.%d" % number)], None) for number in range(2, 8)],
-                           "THROWS", 5),
-    "a_fifth_page_that_is_short": ([("body", junk(29) + [entry("0.6.%d" % number)], None) for number in range(2, 6)]
-                                   + [("body", [entry("0.6.6")], None)],
-                                   [kept("0.6.%d" % number) for number in range(2, 7)], 5),
+    # $PickMaxPages full pages may not be all of it: never one more asked for, and never a part of the
+    # list taken for all of it, which would drop the oldest unsaid.
+    "never_a_sixth_page": ([("body", junk(29) + [entry("0.6.%d" % number)], None)
+                            for number in range(2, MAX_PAGES + 3)], "THROWS", MAX_PAGES),
+    "a_fifth_page_that_is_short": ([("body", junk(29) + [entry("0.6.%d" % number)], None)
+                                    for number in range(2, MAX_PAGES + 1)]
+                                   + [("body", [entry("0.6.%d" % (MAX_PAGES + 1))], None)],
+                                   [kept("0.6.%d" % number) for number in range(2, MAX_PAGES + 2)], MAX_PAGES),
     "a_page_that_fails": ([("body", junk(30), None), ("throw", None, None)], "THROWS", 2),
     "a_page_not_there": ([("body", junk(30), None)], "THROWS", 2),
     "another_host": ([("body", [entry("0.6.11")], "https://api.github.com.example.invalid/repos/%s/%s/releases"
@@ -468,7 +473,7 @@ class ListingTests(unittest.TestCase):
     def test_each_page_is_one_get_with_no_redirect_followed_inside_the_budget(self):
         c = self.answer["constants"]
         self.assertEqual((c["PickPageSize"], c["PickMaxPages"], c["PickBudgetSeconds"], c["PickPageTimeoutMax"]),
-                         (30, 5, 150, 30))
+                         (30, MAX_PAGES, 400, 20))
         for name in PAGE_CASES:
             for call in listed(self.answer["pages"][name]["calls"]):
                 method, _, redirects, seconds, to_file = json.loads(call)
@@ -811,16 +816,20 @@ class VersionsRunTests(PickerRun):
                 self.assertNotIn("compatibility:", output)
 
     def test_a_list_that_goes_on_past_five_pages_lists_nothing(self):
-        """Five full pages may not be all of it: a sixth is never asked for, and the part read is never
-        shown as the whole list, which would leave the oldest releases out unsaid."""
+        """$PickMaxPages full pages (five before v0.6.26, twenty since) may not be all of it: one more is
+        never asked for, and the part read is never shown as the whole list, which would leave the oldest
+        releases out unsaid. Since v0.6.26 a full page whose last release is older than $PickFloor ends the
+        list (tests/test_release_pages_floor.py), so the last page here stops at the floor itself, which is
+        offered."""
         self.installation(INSTALLED)
-        self.serve(*([junk(30)] * 4 + [junk(30 - len(LISTED)) + LISTED]))
+        above = [one for one in LISTED if one["tag_name"] not in ("v0.6.1", "v0.5.7")]
+        self.serve(*([junk(30)] * (MAX_PAGES - 1) + [junk(30 - len(above)) + above]))
         code, output, asked = self.run_it(Versions=True)
         self.assertEqual(code, 12, output[-2000:])
         self.assertEqual(self.answer_lines(output, "versions: "), ["versions: unavailable"])
         self.assertEqual(self.answer_lines(output, "version: "), [])
         self.assertEqual([request[1] for request in asked if request[0] == "Get"],
-                         [PAGES.replace("{page}", str(page)) for page in range(1, 6)])
+                         [PAGES.replace("{page}", str(page)) for page in range(1, MAX_PAGES + 1)])
 
     def test_without_an_installation_it_can_read_nothing_is_asked(self):
         self.serve(LISTED)

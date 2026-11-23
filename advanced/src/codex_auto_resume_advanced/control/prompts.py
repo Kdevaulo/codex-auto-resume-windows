@@ -235,13 +235,13 @@ def cancel(runtime, prompt, generation) -> dict:
 
 def go_on(runtime, prompt, generation) -> dict:
     """advanced-prompt-go-on: a prompt held (the one before it did not arrive, or Codex's queue took it back at a
-    Pause) waits again, the person's word."""
+    Pause) waits again, the person's word - one already due with a day of its own from the press (v0.6.26)."""
     if _stale(runtime, generation):
         return _refused(Refusal.STALE_GENERATION, runtime)
     if type(prompt) is not int:
         return _refused(Refusal.INVALID_REQUEST, runtime)
     try:
-        if not runtime.state.go_on_prompt(prompt):
+        if not runtime.state.go_on_prompt(prompt, at=runtime.clock()):
             return _refused(Refusal.INVALID_REQUEST, runtime)
     except Exception:
         return _refused(Refusal.STATE_UNAVAILABLE, runtime)

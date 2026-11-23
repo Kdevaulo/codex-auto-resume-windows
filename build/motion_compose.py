@@ -230,8 +230,13 @@ class WindowChrome:
         """Where the client area's top-left is on the canvas."""
         return self.at[0], self.at[1] + self.caption
 
-    def frame(self, client: bytes) -> bytearray:
-        """The canvas with the window, its client area `client` (RGB), in its frame."""
+    def frame(self, client: bytes, veil=None) -> bytearray:
+        """The canvas with the window, its client area `client` (RGB), in its frame. With `veil` - (alpha, (r, g, b)): the
+        veil a dialog's frame lays over the window (gui/WindowRender.cs PaintVeil, frames.json's `veil`), which the frame
+        has laid over every pixel of the window - each pixel the window's corner covers only in part is laid as the
+        product's veil lays it (v0.6.26, guifix D10: DialogVeil dims each of the window's pixels at its edge coverage): the
+        window's own colour at its coverage over what is under it, and over both the veil's ink at its alpha times that
+        coverage."""
         canvas = bytearray(self.base)
         canvas_w, canvas_h = self.size
         left, top = self.client_origin()
@@ -253,9 +258,23 @@ class WindowChrome:
         for x, y, cover in self.corners:
             at = ((top + y) * canvas_w + left + x) * bpp
             canvas[at:at + bpp] = self.base[at:at + bpp]
-            _blend(canvas, canvas_w, canvas_h, left + x, top + y, client[(y * width + x) * 3:(y * width + x) * 3 + 3],
-                   cover)
+            colour = client[(y * width + x) * 3:(y * width + x) * 3 + 3]
+            if veil:
+                colour = unveiled(colour, veil)
+            _blend(canvas, canvas_w, canvas_h, left + x, top + y, colour, cover)
+            if veil:
+                _blend(canvas, canvas_w, canvas_h, left + x, top + y, veil[1], (veil[0] * cover + 127) // 255)
         return canvas
+
+
+def unveiled(colour, veil) -> tuple:
+    """The window's own colour under a veil the frame laid over it at its fullest - `colour` is the window's at `veil`'s
+    alpha under its ink (WindowRender.Veiled: (ink * a + under * (255 - a) + 127) // 255) - to the nearest level."""
+    alpha, ink = int(veil[0]), veil[1]
+    if alpha <= 0 or alpha >= 255:
+        return tuple(colour)
+    return tuple(max(0, min(255, int(round((level * 255.0 - ink[c] * alpha) / (255 - alpha)))))
+                 for c, level in enumerate(colour))
 
 
 # ---------------------------------------------------------------------------------------------------- the taskbar

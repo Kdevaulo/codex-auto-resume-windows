@@ -328,7 +328,7 @@ The repository's landing page on GitHub is tidied in the same stage, while paths
 anyway, so that fewer files sit at its root.
 
 Bugs discovered during this refactor will be fixed with regression tests, but the alpha is
-**not intended to be the full repository-wide bug hunt**; v0.6.23 is, in two rounds, and v0.6.24 checks it once more. It is the modularization and
+**not intended to be the full repository-wide bug hunt**; v0.6.23 is, in two rounds, and v0.6.26 checks it once more. It is the modularization and
 nothing else: no feature, and no change anybody could see.
 
 What it carries: the modules that were over their ceiling are packages in the plan's layout -
@@ -1318,6 +1318,7 @@ round of audits in the next version, so the numbers after it moved on: the Rust 
 second round of audits, over the finished code of both editions, and that v0.6.24 is a third round that checks everything again; the numbers after it stand. On 2026-11-18 the owner made the third round a release of its own, v0.6.25, and moved the
 Rust core on to v0.6.26 and its audit to v0.6.27, so the numbers in the sentences above are those of their dates. On 2026-11-21 the owner made v0.6.25 a hotfix final for [#67](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/67) and moved the third round on to v0.6.26 and the Rust core to v0.6.27: v0.6.26 is the last Python release, and the Rust core is v0.6.27.
 
+
 ---
 
 ## v0.6.24 — The window's own look, the usage shown as what is left, and a setup window with something on every page
@@ -1376,6 +1377,10 @@ Expected areas include:
 - the switch of the bundled Python to 3.15, if CPython 3.15.3 is out by then (v0.6.24 did not make it: 3.15.3 was not out).
 
 Right after the final v0.6.26 is published and verified, the last Python version is kept as a repository of its own, as above.
+
+### v0.6.26-beta 🚧 — The third round's fixes: a watcher that says when recovery cannot work, longer release lists and moving pictures that follow the product (a pre-release)
+
+The first pre-release of v0.6.26, in both editions: the watcher judges its own looks and says "Codex changed; recovery cannot work here" on every surface, pairs the app's server by its role and keeps its last good pairing across an update; *Install another version...* reads up to twenty pages of thirty and a new installation a page of releases up to 32 MiB; the window keeps a dialog's typed text under Show desktop, lets Windows handle a press on a waiting window and gives the pointer's cursor back at once; the moving pictures show each glide, fade and hold as the product does it; and the fixes of the third round were reviewed once more. In the advanced edition the forced stop's turn after a reset carries the person's reset message, so the paused queue goes, a message Codex holds in a queue is never taken for undelivered, and Go on gives a held queued message a day of its own.
 
 ---
 
@@ -1703,6 +1708,11 @@ A hotfix final for #67: recoveries on the Codex app 26.1117, whose server runs u
 
         ↓
 
+v0.6.26-beta  🚧 In development
+The first pre-release: the third round's fixes, a watcher that says when Codex changed and recovery cannot work here, release lists of up to twenty pages and moving pictures that follow the product
+
+        ↓
+
 v0.6.26
 The third round: every audit once more over the finished code, the optical audit included, then cleanup, fixes and refactoring; the review of what moves from the advanced edition to the standard one; the switch to Python 3.15 if 3.15.3 is out
 → freeze Python reference behavior
@@ -1727,7 +1737,7 @@ Maintenance
 This document records the current direction; the four pre-releases of v0.6.19, v0.6.19-beta to v0.6.19-beta.4, are out and
 the final v0.6.19, which carries all of them and what reached dev after them, is out; what it did not build is
 v0.6.20, and the four pre-releases of v0.6.20, v0.6.20-beta to v0.6.20-beta.4, are out and the final v0.6.20, which carries all of them and what
-reached dev after them, is out. The hotfix final v0.6.21 and the final v0.6.22, after v0.6.22-beta and -beta.2, are out. v0.6.18 is out: a recovery that worked is recovered however its turn ended,
+reached dev after them, is out. The hotfix final v0.6.21 and the final v0.6.22, after v0.6.22-beta and -beta.2, are out; so are the final v0.6.23, after v0.6.23-beta and -beta.2, the final v0.6.24, after v0.6.24-beta and -beta.2, and the hotfix final v0.6.25. v0.6.18 is out: a recovery that worked is recovered however its turn ended,
 the standard edition suggests the Codex homes this PC uses, Install another version runs in the setup window, the setup
 window's bar fills by real counts, the update's download is streamed, all seventeen translations were reviewed, a full
 audit's fixes landed in every layer, and the advanced edition gains Open Codex on a notice and a weekly update check while

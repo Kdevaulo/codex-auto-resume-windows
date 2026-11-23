@@ -9,7 +9,7 @@ import threading
 import time
 
 from ..domain.errors import AdapterError
-from ..domain.ids import CODEX_APP_PUBLISHER
+from ..domain.ids import CODEX_APP_FAMILY, CODEX_APP_PUBLISHER
 from ..win import authenticode
 from ..win.inventory import resource_users
 from ..win.kernel import process_identity, processes_named
@@ -18,6 +18,9 @@ from .paths import newest_generation
 
 # The two program files the inventory lists: the Codex app's (ChatGPT.exe) and every Codex engine's (codex.exe).
 INVENTORY_NAMES = ("ChatGPT.exe", "codex.exe")
+# v0.6.26 (update resilience #5): and every process of the Codex app's package family, whatever its file is called - a
+# main or a helper an update renamed is still the app's (`app_process`).
+INVENTORY_FAMILIES = (CODEX_APP_FAMILY,)
 # v0.6.24 final: how long, in seconds, one process list answers every caller in this process. One status read asked for
 # it nine times - each advanced capability's view binds the compatibility report to the engine the app serves - and
 # each list was a PowerShell CIM query of about 10 s on the owner's PC: 90-105 s for one read, and a Dashboard that
@@ -31,8 +34,9 @@ _LISTED_LOCK = threading.Lock()
 
 
 def inventory():
-    """Every ChatGPT.exe and codex.exe running: {"pid", "parent", "path"} each - the path None where the process cannot
-    be opened. No command line, no environment and no process memory are read. One list serves every caller for
+    """Every ChatGPT.exe and codex.exe running, and (v0.6.26) every process of the Codex app's package family:
+    {"pid", "parent", "path", "created", "family"} each (win/kernel.py processes_named) - the path and the creation time
+    None where the process cannot be opened. No command line, no environment and no process memory are read. One list serves every caller for
     INVENTORY_SECONDS; each caller gets its own copy. Raises AdapterError("process_inventory_unavailable") where the
     list cannot be made.
 
@@ -44,7 +48,7 @@ def inventory():
     if listed is not None and 0 <= time.monotonic() - listed[0] <= INVENTORY_SECONDS:
         return [dict(row) for row in listed[1]]
     try:
-        rows = processes_named(INVENTORY_NAMES)
+        rows = processes_named(INVENTORY_NAMES, INVENTORY_FAMILIES)
     except (AdapterError, OSError, ValueError):
         raise AdapterError("process_inventory_unavailable") from None
     with _LISTED_LOCK:
@@ -125,18 +129,46 @@ def official_engine(path) -> tuple:
     return answer
 
 
-def _state_holder(servers, codex_home):
+def _database_holders(codex_home):
+    """Who holds the home's newest-generation `queue_N.sqlite` or `state_N.sqlite` open - the generations
+    `SchemaMixin.resolve` reads - asked of the Restart Manager in one session, the one source of loaded state (B12):
+    each holder's pid and creation time, this process left out; nothing where neither database is there (a home that
+    is not there has none). Raises AdapterError("desktop_server_missing_or_ambiguous") where it cannot be asked: no
+    home given, a home that cannot be listed, the Restart Manager unavailable or failing - a pairing that needs the
+    answer then fails closed."""
+    if codex_home is None:
+        raise AdapterError("desktop_server_missing_or_ambiguous")
+    try:
+        try:
+            databases = [path for path in (newest_generation(codex_home, kind) for kind in ("queue", "state"))
+                         if path is not None]
+        except (FileNotFoundError, NotADirectoryError):
+            databases = []
+        holders = resource_users(*databases) if databases else []
+    except (AdapterError, OSError):
+        raise AdapterError("desktop_server_missing_or_ambiguous") from None
+    own = os.getpid()
+    return [holder for holder in holders if isinstance(holder, dict) and holder.get("pid") != own]
+
+
+def _held(rows, holders) -> list:
+    """(row, holder) for each of `rows` the Restart Manager lists among `holders`, matched by pid."""
+    return [(row, holder) for row in rows for holder in holders if holder.get("pid") == row.get("pid")]
+
+
+def _state_holder(servers, codex_home, others=()):
     """Of several same-path Codex servers of the app main (`under_app`), the one holding Codex's state open.
 
     Codex 26.930's app starts a second `codex.exe` beside its app server - `exec-server` for a
     cloud environment - from the same binary under the same main, so path and parent no longer
     name the server (measured 2026-10-04 01:15: the app server held state_5, queue_1, logs_2
     and every thread-writer lock; the exec-server none of them). Who holds the newest-generation
-    `queue_N.sqlite` or `state_N.sqlite` open - the generations `SchemaMixin.resolve` reads -
-    is asked of the Restart Manager in one session, the one source of loaded state (B12); no
-    command line, process memory or window is read. Exactly one candidate among their holders,
+    `queue_N.sqlite` or `state_N.sqlite` open is asked of the Restart Manager (`_database_holders`);
+    no command line, process memory or window is read. Exactly one candidate among their holders,
     or nothing: no home, neither database, the Restart Manager unavailable or failing, none or
-    several candidates holding either - each fails closed, as two candidates always did.
+    several candidates holding either - each fails closed, as two candidates always did. v0.6.26
+    (update resilience #2): so does another codex.exe the app runs (`others`, of another path)
+    holding either - which of them is the server cannot be told.
 
     Either database, never both required: at 02:31 the same day the app server held queue_1
     and no process held state_5 - the app had closed its state database - so the state
@@ -148,17 +180,9 @@ def _state_holder(servers, codex_home):
     Returns (row, holder) - the holder's pid and creation time, which the caller holds the
     process's own identity to, so a reused pid fails closed.
     """
-    if codex_home is None:
-        raise AdapterError("desktop_server_missing_or_ambiguous")
-    try:
-        databases = [path for path in (newest_generation(codex_home, kind) for kind in ("queue", "state"))
-                     if path is not None]
-        holders = resource_users(*databases) if databases else []
-    except (AdapterError, OSError):
-        raise AdapterError("desktop_server_missing_or_ambiguous") from None
-    held = [(row, holder) for row in servers for holder in holders
-            if isinstance(holder, dict) and holder.get("pid") == row.get("pid")]
-    if len(held) != 1:
+    holders = _database_holders(codex_home)
+    held = _held(servers, holders)
+    if len(held) != 1 or _held(others, holders):
         raise AdapterError("desktop_server_missing_or_ambiguous")
     return held[0]
 
@@ -178,12 +202,87 @@ def _package_app(path) -> bool:
     return isinstance(path, str) and bool(app_pattern.fullmatch(path))
 
 
+def _package_file(path) -> bool:
+    """Whether `path` is a file anywhere in a folder of the Codex app's Windows Store package, whatever its version,
+    architecture word or layout inside (v0.6.26, update resilience #5): `WindowsApps\\OpenAI.Codex_<...>__<publisher>\\`
+    and at least one name below it, none of them `..`. Only Windows' own installer writes there."""
+    if not isinstance(path, str) or ".." in path.split("\\"):
+        return False
+    pattern = re.compile(re.escape(str(_windows_apps())) + r"\\OpenAI\.Codex_[^\\]+__" + CODEX_APP_PUBLISHER +
+                         r"(\\[^\\]+)+", re.I)
+    return bool(pattern.fullmatch(path))
+
+
+def _main_slot(path) -> bool:
+    """Whether `path` is a file directly in the package's `app` folder, where its main is (`...\\app\\ChatGPT.exe`) -
+    not in a folder below it, where the package keeps its own engine (`...\\app\\resources\\codex.exe`, #58)."""
+    if not _package_file(path):
+        return False
+    pattern = re.compile(re.escape(str(_windows_apps())) + r"\\OpenAI\.Codex_[^\\]+__" + CODEX_APP_PUBLISHER +
+                         r"\\app\\[^\\]+", re.I)
+    return bool(pattern.fullmatch(path))
+
+
+def app_process(row) -> bool:
+    """Whether the inventory row `row` is a process of the Codex app's own package - a main or a helper: a ChatGPT.exe
+    of the package (`_package_app`), as always, or (v0.6.26, update resilience #5) any other file of the package's
+    folder (`_package_file`) whose process Windows says is of the package's family (`CODEX_APP_FAMILY`, asked as
+    win/kernel.py decide_host asks it) - a main or a helper an update renamed is still the app's. A process outside
+    the package's folder never counts, whatever family it carries (a shell the app started may inherit it), and a
+    file called codex.exe never does, whatever its case, but where the main is (`_main_slot`): an engine - the
+    package's own among them (#58, in a folder below), which a terminal may run - is not one of the app's own
+    processes, and a main renamed Codex.exe, the likeliest name for a package called OpenAI.Codex, still is (review
+    K7)."""
+    if not isinstance(row, dict) or not isinstance(row.get("path"), str):
+        return False
+    if PureWindowsPath(row["path"]).name.lower() == "codex.exe" and not _main_slot(row["path"]):
+        return False
+    if _package_app(row["path"]):
+        return True
+    family = row.get("family")
+    return (isinstance(family, str) and family.casefold() == CODEX_APP_FAMILY.casefold()
+            and _package_file(row["path"]))
+
+
+# A row with no creation time at all: a list made before v0.6.26 (as many tests make one), not a time unread.
+_UNTIMED = object()
+
+
+def _born(row):
+    """`row`'s creation time as the inventory read it (a FILETIME): an int, None where it could not be read, or
+    _UNTIMED where the row carries no time at all."""
+    if not isinstance(row, dict) or "created" not in row:
+        return _UNTIMED
+    value = row.get("created")
+    return value if type(value) is int and value > 0 else None
+
+
+def _started(parent, child, *, to_main) -> bool:
+    """Whether the process of row `parent` can be the one that started the process of row `child` (v0.6.26, update
+    resilience #2, closing audit-core C1): a parent created after its child is not its parent - Windows gave the dead
+    parent's id to a later process - the rule win/kernel.py decide_host holds to. A time that could not be read
+    fails. Rows that carry no time at all are taken as they always were only for the step that ends at the main,
+    which desktop_pair holds to both processes' own identities; a step through a helper needs both times."""
+    up, down = _born(parent), _born(child)
+    if up is _UNTIMED or down is _UNTIMED:
+        return to_main
+    return up is not None and down is not None and up <= down
+
+
+def app_mains(rows) -> list:
+    """Every row that may be the Windows Store app main: a process of the app's package (`app_process`) whose parent
+    is none of the package's own processes - or (v0.6.26) whose listed package parent was created after it, so its own
+    parent is gone. Pure; `_app_main` takes exactly one."""
+    apps = [row for row in rows if app_process(row)]
+    by_pid = {}
+    for row in apps:
+        by_pid.setdefault(row["pid"], []).append(row)
+    return [row for row in apps if not any(_started(up, row, to_main=True) for up in by_pid.get(row.get("parent"), ()))]
+
+
 def _app_main(rows):
-    """The one Windows Store app main among the inventory's rows: the package's ChatGPT.exe whose
-    parent is none of the package's own processes. None, or several, fails closed."""
-    apps = [row for row in rows if isinstance(row, dict) and _package_app(row.get("path"))]
-    app_ids = {row["pid"] for row in apps}
-    mains = [row for row in apps if row.get("parent") not in app_ids]
+    """The one Windows Store app main among the inventory's rows (`app_mains`). None, or several, fails closed."""
+    mains = app_mains(rows)
     if len(mains) != 1:
         raise AdapterError("desktop_main_missing_or_ambiguous")
     return mains[0]
@@ -191,35 +290,34 @@ def _app_main(rows):
 
 def under_app(rows, row, main) -> bool:
     """v0.6.25 (#67): whether the process `row` is one the app main whose pid is `main` runs itself: every process
-    between them - none, or any number - is one of the app package's own ChatGPT.exe processes (`_package_app`), as
-    the inventory's rows list them. The one rule the pairing (`desktop_pair`), the served engines (`server_engines`)
-    and the other-session test (`session_kind`) ask, so it cannot drift between them.
+    between them - none, or any number - is one of the app package's own processes (`app_process`: its ChatGPT.exe
+    processes, and since v0.6.26 any other file of its folder of its family), as the inventory's rows list them. The
+    one rule the pairing (`desktop_pair`), the served engines (`server_engines`) and the other-session test
+    (`session_kind`) ask, so it cannot drift between them.
 
     Codex desktop 26.1117 starts its app server under the package's `--type=utility` ChatGPT.exe (NodeService), whose
     parent is the main, and its exec-server under the main itself; 26.930 started both under the main. Anything else
-    in between - a terminal, a shell, another program's process, a pid the rows do not list or list twice, a loop -
-    is not the app's: a TUI started from a shell the app opened stays another session. Only ids and paths are read,
-    as `inventory` lists them; whoever acts on the answer still holds each process to its own identity."""
+    in between - a terminal, a shell, another program's process, a codex.exe, a pid the rows do not list or list
+    twice, a loop - is not the app's: a TUI started from a shell the app opened stays another session. v0.6.26 (update
+    resilience #2, audit-core C1): nor is a step to a parent created after its child (`_started`): a shell that ended
+    leaves its id to Windows, and a helper given that id later is not the parent of the TUI the shell started. Only
+    ids, paths and creation times are read, as `inventory` lists them; whoever acts on the answer still holds each
+    process to its own identity."""
     if not isinstance(row, dict):
-        return False
-    at = row.get("parent")
-    if at == main:
-        return True
-    if main is None:
         return False
     listed = {}
     for each in rows:
         if isinstance(each, dict):
             listed[each.get("pid")] = None if each.get("pid") in listed else each    # a pid listed twice is no one
-    seen = set()
+    child, at, seen = row, row.get("parent"), set()
     while at not in seen:
         seen.add(at)
         up = listed.get(at)
-        if up is None or not _package_app(up.get("path")):
-            return False
-        at = up.get("parent")
         if at == main:
-            return True
+            return up is None or _started(up, child, to_main=True)
+        if main is None or up is None or not app_process(up) or not _started(up, child, to_main=False):
+            return False
+        child, at = up, up.get("parent")
     return False
 
 
@@ -368,31 +466,53 @@ def session_kind(rows, user, codex_exe) -> bool:
     return held["path"] == row["path"].lower() and held["created"] == user.get("created")
 
 
-def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False):
+def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False, seen=None):
     """Bind the configured official engine to exactly one Windows Store app main.
 
     The app's Codex server is the one process of that main's running the configured engine - its
-    child, or (v0.6.25, #67) the child of a package ChatGPT.exe under it (`under_app`); where
+    child, or (v0.6.25, #67) the child of a package process under it (`under_app`); where
     the main has several such, the one of them holding Codex's queue or state database
     in `codex_home` open (`_state_holder`), and without a `codex_home` none. With `require_holder`
     (v0.6.15-beta, a Codex home other than the default), even one such child must hold that home's
     database open: an app started on another home holds none of this one's, and its recoveries wait.
+
+    v0.6.26 (update resilience #2): on the default home too, one such child is asked of the Restart Manager
+    (`_database_holders`). Where a Codex engine holds the home's newest queue or state database, the child must be
+    one of its holders; and where another codex.exe the app runs (of another path) holds one, which is the server
+    cannot be told - both fail closed, `desktop_server_missing_or_ambiguous`, as two children holding always did. Where
+    no Codex engine holds either - the app had closed its state database, and the queue is not yet open - the one
+    child is the server, as it always was. A Restart Manager that cannot be asked fails closed.
+
+    `seen`, a dict where given, is told whether the paired server was among the holders (`server_holds`): what
+    `session_kind`'s caller asks before it calls a conversation another session's (codex/transport.py).
     """
-    mains = [_app_main(rows)]
-    servers = [row for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-               and row["path"].lower() == str(codex_exe).lower() and under_app(rows, row, mains[0]["pid"])]
+    main = _app_main(rows)
+    engines = [row for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
+               and PureWindowsPath(row["path"]).name.lower() == "codex.exe" and under_app(rows, row, main["pid"])]
+    servers = [row for row in engines if row["path"].lower() == str(codex_exe).lower()]
+    others = [row for row in engines if row["path"].lower() != str(codex_exe).lower()]
     holder = None
     if len(servers) > 1 or (require_holder and servers):
-        row, holder = _state_holder(servers, codex_home)
+        row, holder = _state_holder(servers, codex_home, others)
         servers = [row]
+    elif len(servers) == 1 and codex_home is not None:
+        holders = _database_holders(codex_home)
+        held = _held(servers, holders)
+        codex_pids = {row.get("pid") for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
+                      and PureWindowsPath(row["path"]).name.lower() == "codex.exe"}
+        if _held(others, holders) or (not held and any(each.get("pid") in codex_pids for each in holders)):
+            raise AdapterError("desktop_server_missing_or_ambiguous")
+        holder = held[0][1] if held else None
     if len(servers) != 1:
         raise AdapterError("desktop_server_missing_or_ambiguous")
-    app = process_identity(mains[0]["pid"])
+    app = process_identity(main["pid"])
     server = process_identity(servers[0]["pid"])
-    if app["path"] != mains[0]["path"].lower() or server["path"] != str(codex_exe).lower():
+    if app["path"] != main["path"].lower() or server["path"] != str(codex_exe).lower():
         raise AdapterError("process_identity_changed")
     if holder is not None and holder.get("created") != server["created"]:
         raise AdapterError("process_identity_changed")
     if server["created"] < app["created"]:
         raise AdapterError("process_parent_identity_invalid")
+    if isinstance(seen, dict):
+        seen["server_holds"] = holder is not None
     return {**app, "server": server}

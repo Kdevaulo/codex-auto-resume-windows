@@ -5,7 +5,11 @@ Generalised from make_screenshots.write_apng_patches and make_social.write_motio
 exactly the still - and every later frame as the one rectangle that changed since the frame before, drawn over it
 (APNG_KEEP, APNG_OVER; every pixel opaque, so it is exact) - or, where its changes lie far apart, one rectangle
 each, all but the last shown for the shortest time a browser keeps (`patches`). A frame the same as the one before
-only lengthens it.
+only lengthens it. v0.6.26 (audit M1): a frame marked `whole` - one the product paints in one go, a cut of a plan's
+state: the window reopened in another language, a refresh's snapshot, a page of the setup window - is always the one
+rectangle round its changes: cut in pieces, a viewer saw for 15 ms each states the product never shows (Korean words
+under an English header, "paused" beside "on"). Only what moves by itself between two such cuts - a light, the tray
+icon, the pointer - is cut apart.
 Delays are whole milliseconds, written exactly, never under SHORTEST - the product's own quickest step (browsers show
 10 ms or less as 100 ms). Quality comes before size (the owner, 2026-10-18): nothing is thinned. No palette, no
 dither, nothing lossy - the reason it is an APNG and not a GIF (make_social.py's docstring).
@@ -196,8 +200,9 @@ def _delay(ms: int) -> tuple:
 
 def assemble(path, width: int, height: int, frames, *, still: bytes | None = None, target: int | None = None,
              cap: int | None = None, alpha: bool = False) -> Report:
-    """Writes `frames` - (delay in ms, scene, picture) each, taken one at a time - to `path` as an APNG that
-    loops forever, and reports it. A picture is RGB, or with `alpha` RGBA with straight alpha, every later rectangle
+    """Writes `frames` - (delay in ms, scene, picture) each, or (delay, scene, picture, whole), taken one at a time -
+    to `path` as an APNG that loops forever, and reports it. A `whole` frame is written as one rectangle, never cut
+    apart (see the module's docstring). A picture is RGB, or with `alpha` RGBA with straight alpha, every later rectangle
     then replacing what was under it. `still` is a PNG whose pixels frame 1 must be and whose chunks frame 1 is written
     as. Nothing is written when the picture is over `cap` (BudgetExceeded)."""
     bpp = 4 if alpha else 3
@@ -206,17 +211,20 @@ def assemble(path, width: int, height: int, frames, *, still: bytes | None = Non
     first = next(frames, None)
     if first is None:
         raise ValueError("an APNG needs at least one picture")
-    first = list(first)
+    first = list(first[:3])
     if len(first[2]) != width * height * bpp:
         raise ValueError("a frame of %d bytes in a %dx%d picture" % (len(first[2]), width, height))
     later, previous, scenes = [], first[2], {}
-    for delay, scene, picture in frames:
+    for item in frames:
+        delay, scene, picture = item[:3]
+        whole = len(item) > 3 and bool(item[3])
         if len(picture) != width * height * bpp:
             raise ValueError("a frame of %d bytes in a %dx%d picture" % (len(picture), width, height))
         if picture == previous:
             (later[-1] if later else first)[0] += delay
             continue
-        boxes = patches(previous, picture, width, height, bpp)
+        boxes = [changed(previous, picture, width, height, bpp)] if whole else patches(previous, picture, width, height,
+                                                                                       bpp)
         while len(boxes) > max(1, delay // SHORTEST):
             # Not time enough to show each for SHORTEST: the two that make the smallest rectangle together are one.
             pairs = [(i, j) for i in range(len(boxes)) for j in range(i + 1, len(boxes))]

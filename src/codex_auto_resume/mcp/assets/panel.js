@@ -437,8 +437,13 @@ function attentionCause(status, rows) {
   if (watcher.ticking === false) return 'watcher_not_ticking';
   if (watcher.engine_state === 'incompatible') return 'compatibility_blocked';
   if (watcher.engine_state === 'failed_here') return 'compatibility_failed_here';
+  // v0.6.26: the watcher's own judge found that recovery cannot work here (domain/public.py self_check, its WORDS; the
+  // Dashboard's Blocked).
+  var blocked = (watcher.self_check || {}).blocked;
+  if (typeof blocked === 'string' && (blocked.indexOf('recovery_blocked:') === 0 ||
+                                      blocked.indexOf('detection_blocked:') === 0)) return 'codex_changed';
   var held = ['compatibility_blocked', 'compatibility_failed_here', 'engine_unavailable', 'watcher_not_ticking',
-              'app_server_unmatched'];
+              'app_server_unmatched', 'codex_changed'];
   var list = rows || [];
   for (var i = 0; i < list.length; i++) {
     var overlays = list[i].overlays || [];
@@ -477,7 +482,7 @@ function tone(code) {
   if (['exhausted', 'failed_terminal', 'recovery_failed'].indexOf(code) >= 0) return 'danger';
   if (['failed_retryable', 'outcome_unverified', 'submission_unknown', 'no_progress',
        'engine_unavailable', 'watcher_not_ticking', 'compatibility_blocked', 'compatibility_failed_here',
-       'app_server_unmatched']
+       'app_server_unmatched', 'codex_changed']
       .indexOf(code) >= 0) return 'warning';
   return 'paused';
 }
@@ -1345,6 +1350,7 @@ function heroFacts(status, state, rows) {
               ? t('overlay.compatibility_failed_here', 'Codex checks failed on this computer')
             : cause === 'held' ? t('popup.held', 'Waiting for you to let it continue')
             : cause === 'app_server_unmatched' ? t('overlay.app_server_unmatched', "Codex app's server not matched")
+            : cause === 'codex_changed' ? t('overlay.codex_changed', 'Codex changed; recovery cannot work here')
             : cause === 'engine_unavailable' ? t('status.not_running', 'Watcher not running')
             : t('status.not_responding', 'Watcher not responding');
     return [why, pending];
@@ -1987,7 +1993,7 @@ function renderCompatibility(status, rows) {
     data = fill('compat.source_sequence', '{source}, #{sequence}', {source: data, sequence: sequence});
   }
   var meta = element('div', 'prow-meta compat-meta');
-  [[t('compat.checked', 'Checked'), typeof view.checked_at === 'number' ? clockTime(view.checked_at) : t('time.never', 'never')],
+  [[t('compat.checked', 'Evaluated'), typeof view.checked_at === 'number' ? clockTime(view.checked_at) : t('time.never', 'never')],
    [t('compat.data', 'Data in force'), usable ? data : '-']
   ].forEach(function (pair) {
     var fact = element('span', null, pair[0] + ' ');
@@ -2332,7 +2338,7 @@ function renderContinuation(byName) {
     };
     var field = choiceField(language, (language.choices || []).map(function (choice) {
       return {value: choice, text: choice === 'follow' ? followLabel(read('interface_language')) : endonym(choice)};
-    }), t('help.continuation_language', 'The language of the message sent to Codex.'));
+    }), t('help.continuation_language', 'The language of the message sent to Codex. Unless it follows the interface, changing the interface language leaves it as it is.'));
     var follow = null;
     Array.prototype.forEach.call(field.select.options, function (option) {
       if (option.value === 'follow') follow = option;
@@ -2439,7 +2445,7 @@ function renderPreviewCard() {
   var source = element('p', 'help source');
   source.hidden = true;
   node.appendChild(source);
-  node.appendChild(element('p', 'help', t('preview.note', 'This is the text that will be sent.')));
+  node.appendChild(element('p', 'help', t('preview.note', 'This is the text that will be sent. The watcher adds one line after it to recognize the exact turn it starts.')));
   PREVIEW.nodes = {frame: frame, text: text, source: source};
   return node;
 }

@@ -234,11 +234,15 @@ class RolesTests(ResidentCase):
         lines = [line["code"] for line in self.rt.state.journal(capability="local_api")]
         self.assertLess(lines.index("api.started"), lines.index("api.stopped"))
 
-    def test_what_cannot_be_read_serves_nothing(self):
+    def test_what_cannot_be_read_for_ten_minutes_serves_nothing(self):
+        """v0.6.26 (O2): one failed read keeps what runs (test_advanced_resident_unreadable); a run of them as long as
+        UNREADABLE_FOR serves nothing, as one did before."""
         self.assertTrue(self.arm(self.rt, "local_api")["done"])
         roles = resident.Roles(self.rt, server=self.server)
         roles.follow()
         with patch.object(self.rt, "states", side_effect=RuntimeError("no")):
+            for _check in range(resident.UNREADABLE_FOR // resident.CHECK - 1):
+                self.assertTrue(roles.follow())
             self.assertFalse(roles.follow())
         self.assertEqual(self.servers[0].closed, 1)
 

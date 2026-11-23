@@ -14,14 +14,18 @@ window's own code, offscreen.
 A plan (build/motion/install-en.json, install-ko.json, their scenes and the installer's lines in
 install-scenes.json) says, on one clock, what a person does and what the installer prints: the Welcome page of a
 first installation, Next, the Options page, Install, the run - each step's line as build/install/install.ps1 prints
-it, the bar and the step's name moving on as the window reads them - and the Finish page, its light lit.
+it, the bar and the step's name moving on as the window reads them - and the Finish page, its light lit. Every
+frame tells the window its moment on the picture's clock (v0.6.26, audit-apng M6): the button's hover and press, the
+light's colour and the bar glide there as on a screen, and at the run's end the bar fills for up to its FinishSeconds
+before the window shows the Finish page, at whichever frame it does.
 
 Each frame is drawn by the setup program's own window. build/motion/InstallerRender.cs is compiled TOGETHER with
 the sources build/make_setup.py compiles the setup program from - nothing added to them, nothing taken away - into a
 scratch program that makes the window as the setup program makes it and drives it through its own doors: its primary
 button clicked, its own run started, told the plan's lines one at a time, ended with the code a run that succeeded
 ends with. Nothing is installed, unpacked or started. Round each frame's client area go the caption, frame and corners
-of one captured still of the real setup window (`window.still`), and over it a pointer and a click's ring of our own
+of one captured still of the real setup window in the plan's language (`window.still`, one of FIDELITY: v0.6.26, audit-apng
+M9 - before, the key named a still that never existed and both pictures were framed by the Korean one), and over it a pointer and a click's ring of our own
 (build/motion_compose.py). The frames are written as a lossless APNG within the plan's byte budget
 (build/motion_apng.py), and recorded with what they were made from in assets/install-motion.json.
 
@@ -65,7 +69,8 @@ ENTRY = "CodexAutoResume.InstallerRender"
 CODE = ("build/make_install_motion.py", SHIM, "build/motion_plan.py", "build/motion_compose.py", "build/motion_apng.py",
         "build/motion_fidelity.py")
 # The captured stills of the real setup window the drawing is held to, by language: its Welcome page on a first
-# installation, light, as the main session captures it. Whichever exist are held; the first that exists frames them.
+# installation, light, as the main session captures it or `--still` draws it. Whichever exist are held; each plan is
+# framed by its own language's (`window.still`), so both languages are held before their pictures are made.
 FIDELITY = (("en", "assets/screenshot-setup.png"), ("ko", "assets/screenshot-setup-ko.png"))
 # The installation every frame shows: the fixtures' user (nothing personal in a picture).
 HOME = "C:\\Users\\ExampleUser\\.codex-auto-resume"
@@ -295,7 +300,9 @@ def job(plan: dict, frames: list, out: Path, root: Path = ROOT) -> dict:
     states = []
     for index, frame in enumerate(frames):
         state = {key: value for key, value in motion_plan.thawed(frame.window).items() if key in STATE_KEYS}
-        state.update(index=index, light=frame.t)
+        # v0.6.26 (audit-apng M6): and the frame's moment, which every glide of the window is drawn at - the button's hover
+        # and press, the light's colour, the bar on its way and its fill at the run's end (Transition.RenderMs).
+        state.update(index=index, light=frame.t, moment=frame.t)
         states.append(state)
     import make_screenshots
     import motion_window
@@ -393,12 +400,21 @@ def framed_still(still: tuple, caption: int, client: tuple) -> tuple:
     return width, caption + client_h, bytes(out_rgb), bytes(out_alpha)
 
 
-def fidelity_still(root: Path = ROOT):
-    """(locale, path) of the first captured still of the setup window that exists, or None."""
-    for locale, name in FIDELITY:
-        if (root / name).is_file():
-            return locale, root / name
-    return None
+def plan_still(plan: dict, root: Path = ROOT) -> tuple:
+    """(locale, path) of the still that frames `plan`'s picture and holds its window: its `window.still`, which is the
+    still of the plan's own language among FIDELITY - or PlanError (v0.6.26, audit-apng M9)."""
+    named = (plan.get("window") or {}).get("still")
+    wanted = dict(FIDELITY).get(plan.get("locale"))
+    if wanted is None:
+        raise PlanError("%s: no still of the setup window is held in %r" % (plan.get("name"), plan.get("locale")))
+    if named != wanted:
+        raise PlanError("%s is framed by the still of its own language, %s, not %r" % (plan.get("name"), wanted, named))
+    return plan["locale"], Path(root) / named
+
+
+def stills_to_draw() -> list:
+    """[(locale, path)] `--still` draws: every language's, so each is there to hold its own picture (v0.6.26)."""
+    return list(FIDELITY)
 
 
 def at_rest() -> dict:
@@ -517,6 +533,9 @@ def make(plan: dict, exe: Path, work: Path, still: tuple | None, caption: int, o
     seen_bounds, standing = {}, {}
     origin = (0, caption if still is not None else 0)
     drawn = pictures(result, work / "frames")
+    # The page each frame shows (the shim's `page`): the Finish page comes once the bar's fill is over, at a frame of the
+    # fill and not at the plan's cut.
+    shown = [entry.get("page") for entry in result["frames"]]
 
     def draw(frame, index):
         number, size, client, bounds = next(drawn)
@@ -545,15 +564,19 @@ def make(plan: dict, exe: Path, work: Path, still: tuple | None, caption: int, o
         return bytes(picture)
 
     def run():
-        previous = None
+        # v0.6.26 (audit M1): a frame that changes the window's state - a page, a line of the run, a face - is one
+        # repaint of the window, written as one rectangle (motion_plan.is_cut, motion_apng.assemble's `whole`).
+        previous, before = None, None
         for index, (frame, delay) in enumerate(zip(frames, held)):
             picture = draw(frame, index)
+            whole = motion_plan.is_cut(before, frame) or (index > 0 and shown[index] != shown[index - 1])
+            before = frame
             if previous is not None and picture == previous[2]:
                 previous[0] += delay
                 continue
             if previous is not None:
                 yield tuple(previous)
-            previous = [delay, frame.scene, picture]
+            previous = [delay, frame.scene, picture, whole]
         if previous is not None:
             yield tuple(previous)
 
@@ -588,17 +611,17 @@ def main(argv=None) -> int:
             edition = plans[0]["edition"] if plans else "standard"
             exe = compile_shim(work / "shim", edition)
             theme = (plans[0]["canvas"].get("theme") if plans else None) or "light"
-            wanted = [(locale, still) for locale, still in FIDELITY if (ROOT / still).is_file()] or [FIDELITY[-1]]
-            for locale, still in wanted:
+            for locale, still in stills_to_draw():
                 target = (out_dir / still) if out_dir is not None else ROOT / still
                 print("still %-4s %s  %s  (drawn offscreen)" % (locale, target, draw_still(exe, work, locale, target,
                                                                                          theme=theme, edition=edition)))
         if out_dir is not None:
             stills_root = out_dir
-    found = fidelity_still(stills_root)
-    if found is None and not client_only:
-        raise SystemExit("no captured still of the setup window (%s): capture one first, or draw a proof with "
-                         "--out DIR --client-only" % ", ".join(name for _locale, name in FIDELITY))
+    framing = {plan["name"]: plan_still(plan, stills_root) for plan in plans}
+    missing = sorted({str(path) for _locale, path in framing.values() if not path.is_file()})
+    if missing and not client_only:
+        raise SystemExit("no captured still of the setup window in %s: draw them first (--still), or draw a proof "
+                         "with --out DIR --client-only" % ", ".join(missing))
     manifest = read_manifest()
     with tempfile.TemporaryDirectory(prefix="install-motion-") as name:
         work = Path(name)
@@ -619,15 +642,15 @@ def main(argv=None) -> int:
             raise SystemExit("the setup window drawn offscreen is not the captured one in %s" % ", ".join(failed))
         if "--fidelity" in argv:
             return 0
-        still, caption = None, 0
-        if found is not None and not client_only:
-            import make_screenshots
-            locale, path = found
-            still = make_screenshots.read_png(path)
-            caption = still[1] - results[locale]["client"][1]
-            if caption < 0:
-                raise SystemExit("%s is shorter than the window's client area" % path)
         for plan in plans:
+            still, caption = None, 0
+            if not client_only:
+                import make_screenshots
+                locale, path = framing[plan["name"]]
+                still = make_screenshots.read_png(path)
+                caption = still[1] - results[locale]["client"][1]
+                if caption < 0:
+                    raise SystemExit("%s is shorter than the window's client area" % path)
             output = (out_dir / Path(plan["output"]).name) if out_dir is not None else ROOT / plan["output"]
             report, size = make(plan, exe, work / plan["name"], still, caption, output)
             print("%s  %d bytes, %d frames, %.2f s, %dx%d%s" % (output, report.size, report.frames, report.ms / 1000.0,

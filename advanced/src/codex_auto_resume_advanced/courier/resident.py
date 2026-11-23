@@ -34,6 +34,12 @@ API = "local_api"
 API_LAN = "local_api_lan"
 TELEGRAM = "telegram_remote"
 CHECK = 10                       # seconds between two reads of the states
+# v0.6.26 (the owner's logs, O2): a read of the states that fails - the state busy, a read that took 90-105 s on 2026-11-19
+# - is no reading that says off. What runs keeps running, and the read is tried again every CHECK seconds, for up to this
+# long in a row; only then is nothing served and the process ended, as before. On 2026-11-19 one failed read each time
+# ended the resident, and four ends in an hour left the local API down for the hour (engine/remote.py RESTARTS).
+UNREADABLE_FOR = 600
+UNREADABLE = "unreadable"        # its journal code, once for each run of failed reads, beside each role that runs
 SYNCHRONIZE = 0x00100000
 
 
@@ -70,6 +76,7 @@ class Roles:
         self.thread, self.stop = None, None
         self.server, self.serving = None, None          # the server, and the (port, lan) it serves on
         self._taken = None                              # the (port, lan) last found taken, journalled once
+        self._unread = 0                                # reads of the states failed in a row
         self._mark(None)                                # a resident before this one said nothing about this one
 
     def wanted(self) -> tuple:
@@ -87,8 +94,14 @@ class Roles:
         """The roles brought to what the states ask for; whether any is wanted."""
         try:
             port, lan, telegram = self.wanted()
+            self._unread = 0
         except Exception:
-            port, lan, telegram = None, False, False          # unreadable: nothing is served
+            self._unread += 1
+            if self._unread == 1:
+                self._count_unreadable()
+            if self._unread * CHECK < UNREADABLE_FOR:
+                return True                                   # nothing read says off: kept as it is, read again
+            port, lan, telegram = None, False, False          # unreadable this long: nothing is served
         if self.server is not None and self.serving != (port, lan):
             self._close_server()
         if port is not None and self.server is None:
@@ -112,6 +125,15 @@ class Roles:
             self.thread.start()
             self.runtime.state.counted(TELEGRAM, "started")
         return port is not None or telegram
+
+    def _count_unreadable(self) -> None:
+        """A run of failed reads, journalled once beside each role that runs (local_api's where none does), so a later
+        end or gave_up can be told from a person turning it off. Never fatal."""
+        for capability in [API] * (self.server is not None) + [TELEGRAM] * (self.thread is not None) or [API]:
+            try:
+                self.runtime.state.counted(capability, UNREADABLE)
+            except Exception:
+                pass
 
     def _close_server(self) -> None:
         try:

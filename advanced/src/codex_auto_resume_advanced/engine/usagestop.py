@@ -18,11 +18,18 @@ a notice says to open it in Codex. That turn is also what lets the queue go: onc
 queued and the pause is gone (measured 2026-10-16). Where Continue after the reset is off, nothing will, and a notice
 asks the person to press Resume in Codex.
 
+v0.6.26 (R2, review V1): where reset_message is on and the person's own message for that conversation falls due at that
+very reset, that turn carries the message's words and its marker instead of the continuation's - the person's message
+goes, once, and the turn lets the paused queue go; reset_message leaves such a message to it (resetmessage.carried_by_stop)
+rather than queuing it into the paused queue, where it would sit for good.
+
 Every outcome is one closed word, journalled (registry codes); never a conversation's words.
 """
 from __future__ import annotations
 
-from codex_auto_resume import continuation, settings
+import contextlib
+
+from codex_auto_resume import continuation, failures, settings
 from codex_auto_resume.domain import ids
 from codex_auto_resume.domain.plug import DEFER
 from codex_auto_resume.domain.plughands import Widening
@@ -30,9 +37,11 @@ from codex_auto_resume.domain.plughands import Widening
 from .. import statement
 from ..codex import inuse, ipc
 from ..codex.turns import Turns, booted_of
-from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
+from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState, RuleState
 from .continued import answer_key, words_pass
-from .usage import AFTER_RESET_KEY, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP, UsagePause, _reset_since
+from . import resetwatch
+from .resetmessage import ResetMessage
+from .usage import AFTER_RESET_KEY, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP, UsagePause, _reset_since, windows
 FINAL = frozenset({"completed", "failed", "interrupted"})
 # How many notices the stop keeps for the icon to show (each once in a watcher's life, by its key).
 NOTICES_KEPT = 16
@@ -40,6 +49,45 @@ NOTICES_KEPT = 16
 # every tick, each of which may wait for the app's answers.
 BACKOFF_SECONDS = 300
 BACKOFF_MOST = 3600
+# v0.6.26 (audit-advanced2 R2, the owner's answer of 2026-11-22, "the reset message only"): a person's reset message for a
+# conversation this stopped, going at the very reset its continuation waits for, goes INSTEAD of that continuation - as
+# reset_message's statement promises ("in place of a continuation waiting there for the same reset"). Its code is
+# reset_message's (engine/resetmessage.py); MESSAGE_INSTEAD is this capability's journal word for a continuation it ended
+# so.
+RESET_MESSAGE = "reset_message"
+MESSAGE_INSTEAD = "message_instead"
+# v0.6.26 (review V1): the core of R2's fix. reset_message's message goes into Codex's queue, which the stop paused, and
+# only the turn this capability starts after the reset lets that queue go (MIPC): ending the continuation for it left
+# both waiting for good. So the stop's turn after the reset carries the message's words itself, once, in the
+# continuation's place (`_carry`), and reset_message leaves such a message to it (resetmessage.carried_by_stop). What
+# `_message_instead` finds of one: carried by that turn, gone instead, or sent into the paused queue.
+CARRY, INSTEAD, QUEUED, CONTINUE = "carry", "instead", "queued", "continue"
+# The app's own answers that the turn was not started: the message waits again with its words.
+REFUSED_STARTS = frozenset({ipc.Stop.NO_CLIENT, ipc.Stop.VERSION_MISMATCH, ipc.Stop.REFUSED})
+
+
+def _time(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _counts_here(rule, window, row, rows, now) -> bool:
+    """Whether a counting message falls due at the very reset continuation `row` waits for - by reset_message's own
+    guard (resetmessage.ResetMessage._same_reset, review V2): its occasion is the next reset of its window, and the
+    window open now resets when that continuation's reset is, not yet HOLD_FOR past. That reset is read from the meter
+    (`rows`) as `_reset_since` reads it: the reset it shows where its window was open at the stop, else the start of
+    the window it shows, which began after the stop. Or its occasion counted already, by a reset counted since the
+    stop - due, marked so at reset_message's next look (resetwatch.due). A rule for a later reset, or one whose
+    occasion was counted before the stop, is not this one's."""
+    if (window is not None and resetwatch.due(rule, window) and _time(window.get("last_closed_at"))
+            and window["last_closed_at"] >= row["created_at"]):
+        return True
+    found = [meter for meter in windows(rows) if meter["minutes"] == row["chain"]]
+    reset = found[0]["reset_at"] if found else None
+    if not _time(reset):
+        return False
+    if reset - row["chain"] * 60 > row["created_at"]:
+        reset -= row["chain"] * 60
+    return ResetMessage._same_reset(rule, window, {"category": failures.USAGE_LIMIT, "reset_at": reset}, now)
 
 
 class _StopErrand:
@@ -215,6 +263,20 @@ class UsageStop(UsagePause):
             if not _reset_since(rows, row["chain"], row["created_at"], now):
                 continue
             thread = row["thread_id"]
+            found = self._message_instead(row, rows, now)
+            if found is None:
+                continue                                                # not known now: nothing sent, asked next look
+            if found[0] == INSTEAD:
+                handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)          # the person's message went (R2)
+                self._count(MESSAGE_INSTEAD)
+                continue
+            if found[0] == QUEUED:
+                # Sent into the queue the stop paused (core queued it before this version carried such messages): only a
+                # turn lets that queue go, and any turn started would carry words of its own beside it. Nothing more is
+                # sent; the person is asked to press Resume in Codex, and this waits, so a chat message there is still
+                # left with Codex (engine/chat.paused_by_stop). Their message running there ends it as newer work.
+                if self._notice("press_resume", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"}):
+                    self._count("resume_unproven")
             try:
                 if view.thread_enabled(thread) is not True:
                     continue
@@ -226,11 +288,14 @@ class UsageStop(UsagePause):
             if latest is None or latest.ordinal != row["ordinal"]:
                 handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)          # newer work came (A17)
                 continue
-            if latest.status not in FINAL:
+            if latest.status not in FINAL or found[0] == QUEUED:
                 continue
             failures, again = self._backoff.get(row["record_id"], (0, 0))
             if now < again:
                 continue                                                # failed lately: asked again later
+            if found[0] == CARRY:
+                self._carry(row, found[1], start, guard, now, failures)
+                continue
             word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]), gate=guard)
             if word == ipc.Stop.HELD:
                 continue                                                # held by core: asked again when it lets go
@@ -250,15 +315,107 @@ class UsageStop(UsagePause):
                 self._count("not_continued")
                 self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
 
+    def _carry(self, row, rule, start, guard, now, failures) -> None:
+        """v0.6.26 (review V1): the stop's turn after the reset, started as continuation `row`'s would be, carrying the
+        person's reset message `rule` instead - its words, a blank line and its own marker, as core's one send carries
+        them - so the message reaches Codex once and the turn lets the paused queue go (MIPC: start_turn is the measured
+        route, and the only one). The message's launch is written inside core's guard just before the one request
+        (state/resets.carry_message): a restart then finds it sent and never sends it again, and a Cancel is refused.
+        Started, or written with no answer in time (it may have started): the message is sent, watched by core until its
+        marker is in Codex's history, and the continuation ends superseded. The app answering no: the message waits
+        again with its words, and the start is asked again after the backoff."""
+        handle, resets, thread = self._scoped.continuations, self._scoped.resets, row["thread_id"]
+        launched = []
+
+        @contextlib.contextmanager
+        def launch():
+            with (guard() if guard is not None else contextlib.nullcontext(True)) as permitted:
+                if permitted is True:
+                    try:
+                        permitted = resets.carry_message(rule["rule_id"]) is True
+                    except Exception:
+                        permitted = False
+                    if permitted:
+                        launched.append(True)
+                yield permitted
+        try:
+            word = start(thread, rule["words"] + "\n\n" + ids.short_marker(rule["record_id"]), gate=launch)
+        except Exception:
+            word = ipc.Stop.BROKEN
+        if launched and word not in REFUSED_STARTS:
+            try:
+                resets.carried_message(rule["rule_id"], True)
+            except Exception:
+                pass                                       # launched: a restart takes it as sent (resetmessage.records)
+            self._backoff.pop(row["record_id"], None)
+            handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)
+            self._count(MESSAGE_INSTEAD)
+            return
+        if launched:
+            try:
+                resets.carried_message(rule["rule_id"], False)
+            except Exception:
+                pass
+        if word == ipc.Stop.HELD and not launched:
+            return                                         # held by core: asked again when it lets go
+        self._backoff[row["record_id"]] = (failures + 1, now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))
+        self._count("not_continued")
+        self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
+
+    def _message_instead(self, row, rows, now):
+        """What of the person's reset messages stands for continuation `row` at the reset it waits for (R2, the owner's
+        answer of 2026-11-22, "the reset message only"; review V1-V3) - one of reset_message's rules for that
+        conversation and that window, reset_message on:
+        (CARRY, rule)   due since the stop, waiting with its words: the stop's turn carries it in the continuation's place
+                        (`_carry`), for reset_message leaves it to that turn (resetmessage.carried_by_stop);
+        (INSTEAD, rule) sent since the stop by that turn, or delivered: the continuation ends superseded;
+        (QUEUED, rule)  sent since the stop into Codex's queue, which the stop paused: nothing more is sent (`after_reset`);
+        None            not known now, or counting for this very reset still - its occasion the next reset of its
+                        window, that window the one open at the stop (resetmessage's own `_same_reset`, at most HOLD_FOR
+                        past that reset): asked next look, nothing sent on a guess that two may go;
+        (CONTINUE, None) none of these: the continuation goes. A message held for a person (count_gap, window_gone, ask
+                        first) may never go, and one counting for a later reset is not this one's: neither takes it."""
+        scoped = self._scoped
+        try:
+            rules = [rule for rule in scoped.resets.reset_rules(capability=RESET_MESSAGE, pending=None)
+                     if rule.get("thread_id") == row["thread_id"] and rule.get("minutes") == row["chain"]]
+            counted = scoped.resets.windows() if rules else {}
+            on = scoped.armed(RESET_MESSAGE) is True if rules else False
+        except Exception:
+            return None
+        since, waiting = row["created_at"], None
+        for rule in rules:
+            state, flying = rule.get("state"), rule.get("record_state") == RecordState.IN_FLIGHT
+            sent = next((rule.get(name) for name in ("sent_at", "launching_at") if _time(rule.get(name))), None)
+            if state == RuleState.DONE and _time(rule.get("sent_at")) and rule["sent_at"] >= since:
+                return INSTEAD, rule
+            if state != RuleState.READY:
+                family = (rule.get("bucket"), rule.get("minutes"))
+                if state == RuleState.COUNTING and on and _counts_here(rule, counted.get(family), row, rows, now):
+                    waiting = True
+                continue
+            if flying:
+                if sent is None:
+                    waiting = True                                 # claimed, its launch not begun: asked next look
+                elif sent >= since:
+                    return (QUEUED if rule.get("queue_id") is not None else INSTEAD), rule
+                continue
+            if (on and rule.get("record_state") == RecordState.WAITING and rule.get("words")
+                    and _time(rule.get("due_at")) and rule["due_at"] >= since):
+                return CARRY, rule
+        return None if waiting else (CONTINUE, None)
+
     # ---------------------------------------------------------------- the icon's notices
-    def _notice(self, kind, window) -> None:
+    def _notice(self, kind, window) -> bool:
+        """A notice for the icon, once by its key: whether it is new."""
         now = self._scoped.now()
         key = "%s:%s:%s" % (kind, window.get("minutes"), window.get("reset_at") or int(now // NOTICE_FOR))
         if any(notice["key"] == key for notice in self._notices):
-            return
+            return False
         self._notices.append({"key": key, "kind": kind, "window_minutes": window.get("minutes"), "at": now,
                               "reset_at": window.get("reset_at")})
         del self._notices[:-NOTICES_KEPT]
+        return True
 
     def notices(self, now) -> list:
         """What the stop has to say to the icon now: the notices of the last NOTICE_FOR seconds - its key, kind

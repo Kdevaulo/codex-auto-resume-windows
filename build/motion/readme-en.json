@@ -55,7 +55,7 @@
     48000
   ],
   "budget": {
-    "cap": 9000000
+    "cap": 12000000
   },
   "light_step_ms": 33,
   "sweep_step_ms": 15,

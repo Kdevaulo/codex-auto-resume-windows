@@ -824,6 +824,8 @@ namespace CodexAutoResume
             string engine = Str(watcher, "engine_state");
             if (engine == "incompatible") return "compatibility_blocked";
             if (engine == "failed_here") return "compatibility_failed_here";
+            // v0.6.26: the watcher's own judge found that recovery cannot work here (domain/public.py self_check).
+            if (Blocked(watcher) != null) return "codex_changed";
             if (pending != null)
                 foreach (object entry in pending)
                 {
@@ -846,7 +848,17 @@ namespace CodexAutoResume
         /// The overlays that hold a record for something only a person can put right, in the order AttentionCause
         /// names them (tray_popup.ATTENTION_OVERLAYS).
         private static readonly string[] HeldFor =
-            { "compatibility_blocked", "compatibility_failed_here", "engine_unavailable", "watcher_not_ticking", "app_server_unmatched" };
+            { "compatibility_blocked", "compatibility_failed_here", "engine_unavailable", "watcher_not_ticking", "app_server_unmatched",
+              "codex_changed" };
+
+        /// v0.6.26: the word of the watcher's own judge that recovery cannot work here (domain/public.py WORDS) - as
+        /// "recovery_blocked:held_elsewhere" - or null (tray_popup._blocked, panel.js blockedWord).
+        internal static string Blocked(Dictionary<string, object> watcher)
+        {
+            string word = Str(Map(watcher, "self_check"), "blocked");
+            return word != null && (word.StartsWith("recovery_blocked:", StringComparison.Ordinal) ||
+                                    word.StartsWith("detection_blocked:", StringComparison.Ordinal)) ? word : null;
+        }
 
         /// A public code of a record already handed to Codex, or being followed or taken back out of it
         /// (tray_popup.MOVING_CODES): every pending record that is not waiting.
@@ -886,6 +898,8 @@ namespace CodexAutoResume
                 recovery = Said(strings, "popup.held", "Waiting for you to let it continue");
             else if (cause == "app_server_unmatched")
                 recovery = Said(strings, "overlay.app_server_unmatched", "Codex app's server not matched");
+            else if (cause == "codex_changed")
+                recovery = Said(strings, "overlay.codex_changed", "Codex changed; recovery cannot work here");
             else if (cause != null)
                 recovery = Said(strings, "status.not_responding", "Watcher not responding");
             else
@@ -929,7 +943,7 @@ namespace CodexAutoResume
             if (Equals(Get(status, "upgrade_pending"), true)) return "attention";
             var watcher = Map(status, "watcher");
             if (Equals(Get(watcher, "ticking"), false) || Str(watcher, "engine_state") == "incompatible" ||
-                Str(watcher, "engine_state") == "failed_here")
+                Str(watcher, "engine_state") == "failed_here" || Blocked(watcher) != null)      // v0.6.26
                 return "attention";
             if (pending != null)
                 foreach (object entry in pending)
@@ -940,6 +954,7 @@ namespace CodexAutoResume
                                         HasOverlay(row, "engine_unavailable") ||
                                         HasOverlay(row, "watcher_not_ticking") ||
                                         HasOverlay(row, "app_server_unmatched") ||      // #58's follow-up
+                                        HasOverlay(row, "codex_changed") ||             // v0.6.26
                                         HasOverlay(row, "held")))      // v0.6.20: waiting for a person
                         return "attention";
                 }

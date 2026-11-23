@@ -11,7 +11,9 @@ The replies are the bridge's own, asked here of the generator's pinned scratch i
 (make_screenshots.pinned_installation: the same records, the same clock, the same stand-in registry and engine the
 wire goldens and the envelope are asked of), one set per language the picture shows, with what a Save in the picture
 stored (`forms` in the plan). Every command the window sends that is not among them - each one that would change
-something - is refused, so the render mode can neither write nor start anything.
+something - is refused, so the render mode can neither write nor start anything. v0.6.26 (audit-apng M7): among them is
+what the pinned installation answers to Retry now on each waiting task, asked of it after every read, so a frame that
+says the answer came (`answered`) shows the note the window writes for that answer; the render only reads it.
 
 This compiles its own copy of the window (gui/window.sources, gui/app.manifest) into a scratch folder, and runs it
 there with CREATE_NO_WINDOW. Every job is drawn at the stills' pinned scale (make_screenshots.PINNED_SCALE, 150 %), not
@@ -117,6 +119,15 @@ def answers(locale: str, stored: dict | None = None, paused: bool = False) -> li
                                                 (replies["settings"] or {}).get("settings") or {})
                 if preview is not None:
                     out.append({"command": preview[0], "argument": None, "reply": shots.ask(surface, *preview)})
+                # v0.6.26 (audit-apng M7): what Retry now on each waiting task gets - asked last, after every read, of
+                # the scratch installation, whose watcher is not running (its wake event is its own state folder's). An
+                # answer it refuses is left out: the render then draws no note, and says so.
+                for row in (replies["dashboard"] or {}).get("pending") or []:
+                    argument = {"interruption_id": row["interruption_id"]}
+                    reply = shots.ask(surface, "retry-now", argument)
+                    if reply.get("ok"):
+                        out.append({"command": "retry-now", "argument": json.dumps(argument, separators=(",", ":")),
+                                    "reply": reply})
             finally:
                 if previous is None:
                     os.environ.pop(l10n.ENV_LANG, None)
@@ -136,9 +147,12 @@ def frame_state(frame: motion_plan.Frame, index: int, light_step: int = 0, clock
     the window's own clock has gone on from the pinned moment (motion_plan.clock_at), which every countdown and age it
     shows is read at (WindowRender.RenderClock). While the status light sweeps (v0.6.24), also `sweep`: how far into it the
 frame is, in ms (motion_plan.sweep_ms) - the sweep and the line under the headline drawn at that moment
-(WindowRender.RenderSweep)."""
+(WindowRender.RenderSweep). v0.6.26 (audit-apng M6): and `moment`, the frame's own moment on the picture's clock, in ms,
+which every glide of the window is drawn at (Transition.RenderMs): a hover, a press, the current tab, the busy look, the
+light's colour, each from the frame it began at."""
     state = motion_plan.thawed(frame.window)
     state["index"] = index
+    state["moment"] = frame.t
     # The light's sweep (v0.6.24) as how far into it the frame is, in ms; gone once it is over.
     state.pop("sweep", None)
     swept = motion_plan.sweep_ms(frame)
@@ -223,6 +237,17 @@ def render(exe: Path, job_data: dict, folder: Path) -> dict:
     if read.get("error") or done.returncode != 0:
         raise RuntimeError("the render mode failed (exit %d): %s" % (done.returncode, read.get("error")))
     return read
+
+
+def veils(result: dict) -> dict:
+    """{frame index: (alpha, (r, g, b))} for each frame that lays a dialog's veil over the window (the render mode's
+    `veil`, v0.6.26): what the compositor dims the window's partly covered edge by (motion_compose.WindowChrome.frame)."""
+    out = {}
+    for entry in result.get("frames") or []:
+        veil = entry.get("veil")
+        if veil:
+            out[int(entry["index"])] = (int(veil[0]), tuple(int(channel) for channel in veil[1:4]))
+    return out
 
 
 def pictures(result: dict, folder: Path):

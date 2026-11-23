@@ -104,7 +104,9 @@ ITEM = {_q(name): item for item, names in {
                "engine.routes",
                # and which conversations besides the app's are watched (P18), one sent to another session (P16),
                # and a full context window's compaction turns.
-               "engine.kinds", "engine.tosession", "engine.compaction", "engine.recordchannel"),
+               "engine.kinds", "engine.tosession", "engine.compaction", "engine.recordchannel",
+               # v0.6.26: whether recovery cannot work here, judged of the watcher's own looks - pure.
+               "engine.impossible"),
     "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",
@@ -176,7 +178,9 @@ ITEM = {_q(name): item for item, names in {
               # and the ids a split conversation has had, remembered.
               "codex.rollout", "codex.chains",
               # v0.6.16-beta.4: which kinds of conversation are taken up (P18), pure.
-              "codex.eligibility"),
+              "codex.eligibility",
+              # v0.6.26: the Codex app's process layout counted by role, and the watcher's look when it changes.
+              "codex.layout"),
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
                 "control.layer", "control.policy", "control.preview", "control.records",
                 "control.seen", "control.state", "control.watcher", "control.wire",

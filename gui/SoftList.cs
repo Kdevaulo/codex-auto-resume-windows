@@ -431,26 +431,70 @@ namespace CodexAutoResume
             editionBox.Offset(x, y);
         }
 
+        /// v0.6.26 (audit D11): how far below its place it draws its words now, 0 to below 1 device pixel - the rest of a
+        /// pixel of the pill's nudge (PillHint.Offset, VersionPill.Shift).
+        internal float Shift;
+
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (Shift <= 0.01f)
+            {
+                Words(e, false);
+                return;
+            }
+            // Drawn as ever into a picture of itself, laid that much lower: the words move by less than a pixel. Onto its own
+            // ground (opaque): GDI draws words over nothing it knows in a picture without ClearType - grey, and heavier than
+            // the same words at rest beside it on the screen (measured at 100 %, Microsoft Sans Serif and Segoe UI: a stem's
+            // column 15 where at rest it was 242-339 in ClearType's colours), so the words changed look for the whole nudge.
+            using (var picture = new Bitmap(Math.Max(1, Width), Math.Max(1, Height)))
+            {
+                using (Graphics g = Graphics.FromImage(picture))
+                {
+                    g.Clear(BackColor);
+                    Words(new PaintEventArgs(g, ClientRectangle), true);
+                }
+                e.Graphics.Clear(BackColor);
+                GraphicsState state = e.Graphics.Save();
+                e.Graphics.InterpolationMode = InterpolationMode.Bilinear;
+                e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                e.Graphics.DrawImage(picture, new RectangleF(0f, Shift, picture.Width, picture.Height),
+                                     new RectangleF(0f, 0f, picture.Width, picture.Height), GraphicsUnit.Pixel);
+                e.Graphics.Restore(state);
+            }
+        }
+
+        /// Its words; `opaque`, each on its own ground (BackColor), as into the picture a shifted label is drawn from.
+        private void Words(PaintEventArgs e, bool opaque)
+        {
+            // Label's disabled ink (TextRenderer.DisabledTextColor), as WrapLabel draws it.
+            Color disabled = Palette.Contrast ? SystemColors.GrayText
+                           : BackColor.GetBrightness() < SystemColors.Control.GetBrightness() ? ControlPaint.Dark(BackColor)
+                           : SystemColors.ControlDark;
+            Color ink = Enabled ? ForeColor : disabled;
             if (!Split)
             {
-                base.OnPaint(e);
+                if (!opaque)
+                {
+                    base.OnPaint(e);
+                    return;
+                }
+                // As Label draws it (WrapLabel.Format, in its padding), on its ground.
+                var face = new Rectangle(Padding.Left, Padding.Top, Math.Max(0, ClientSize.Width - Padding.Horizontal),
+                                         Math.Max(0, ClientSize.Height - Padding.Vertical));
+                TextRenderer.DrawText(e.Graphics, Lines(face.Width), Font, face, ink, BackColor, Format);
                 return;
             }
             Rectangle versionBox, editionBox;
             bool below;
             Placed(out versionBox, out editionBox, out below);
-            // Label's disabled ink (TextRenderer.DisabledTextColor) for both, as WrapLabel draws it.
-            Color disabled = Palette.Contrast ? SystemColors.GrayText
-                           : BackColor.GetBrightness() < SystemColors.Control.GetBrightness() ? ControlPaint.Dark(BackColor)
-                           : SystemColors.ControlDark;
-            Color ink = Enabled ? ForeColor : disabled;
             Color quiet = Enabled ? EditionColor : disabled;
-            TextRenderer.DrawText(e.Graphics, version, Font, versionBox, ink, LineFormat);
+            if (opaque) TextRenderer.DrawText(e.Graphics, version, Font, versionBox, ink, BackColor, LineFormat);
+            else TextRenderer.DrawText(e.Graphics, version, Font, versionBox, ink, LineFormat);
             TextFormatFlags format = Mirror.Words(Mirror.Of(this), EditionFormat(below));
             string word = below ? Soft.Wrap(edition, AsideFont, Math.Max(1, editionBox.Width), format) : edition;
-            TextRenderer.DrawText(e.Graphics, word, AsideFont, editionBox, quiet, format);
+            // The edition after the version, whose ground it is drawn on starts after the version's last letter.
+            if (opaque) TextRenderer.DrawText(e.Graphics, word, AsideFont, editionBox, quiet, BackColor, format);
+            else TextRenderer.DrawText(e.Graphics, word, AsideFont, editionBox, quiet, format);
             EditionDrawn = quiet;
         }
 
@@ -660,12 +704,33 @@ namespace CodexAutoResume
         /// nothing but its looks.
         internal PillHint Hint;
 
+        private float shift;
+
+        /// v0.6.26 (audit D11): how far below its place it draws itself now - its body, its ring and its words - 0 to below
+        /// 1 device pixel: the rest of a pixel of its hint's nudge (PillHint.Offset), so it moves smoothly where it is
+        /// placed in whole pixels.
+        internal float Shifted { get { return shift; } }
+
+        internal void Shift(float down)
+        {
+            down = Math.Max(0f, Math.Min(0.999f, down));
+            if (Math.Abs(down - shift) < 0.005f) return;
+            shift = down;
+            label.Shift = down;
+            Invalidate();
+            label.Invalidate();
+        }
+
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             float radius = Height / 2f;
-            Ground.PaintBehind(this, e.Graphics, ClientRectangle, radius);
+            if (shift <= 0.01f) Ground.PaintBehind(this, e.Graphics, ClientRectangle, radius);
+            else Ground.PaintArea(this, e.Graphics, ClientRectangle);
+            GraphicsState state = e.Graphics.Save();
+            if (shift > 0.01f) e.Graphics.TranslateTransform(0f, shift);
             Soft.Body(e.Graphics, ClientRectangle, radius, Palette.Raised, Palette.Line, (string)null);
             if (Hint != null) Hint.PaintRing(e.Graphics, ClientRectangle, radius);
+            e.Graphics.Restore(state);
         }
 
         protected override void Dispose(bool disposing)
