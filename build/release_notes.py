@@ -16,6 +16,8 @@ would have pointed one folder too high.
 from __future__ import annotations
 
 import argparse
+import ast
+import json
 import posixpath
 from pathlib import Path
 import re
@@ -178,7 +180,55 @@ def notes(text: str, version: str) -> str:
     if len(body) > BODY_MAX:
         raise ValueError("the release notes of %s are %d characters, over the %d a release body may have: shorten "
                          "the changelog entry" % (version, len(body), BODY_MAX))
+    named = hidden_named(body)
+    if named:
+        raise ValueError("the release notes of %s name %r, a special day or a hidden press, which stay out of every "
+                         "release body: take it out of the changelog entry" % (version, named))
     return body
+
+
+# The special days and the hidden presses stay out of the release notes as out of every document (the owner, 2026-11-16;
+# audit4 F4). The words are taken from the code, not written here: brand/days.py's DAY_LOOKS (each day's name, as written
+# and with a space or a hyphen for its underscore, and its colours), the catalogs' status.aside keys and every sentence
+# they give in every language, and the phrases tests/test_gui_v0623_days.py already keeps out of the documents
+# (HIDDEN_PHRASES, held to that test by tests/test_release_notes_hidden.py). A word counts only whole, in any case, so
+# "day", "press" or "Monday" are never refused.
+DAYS_SOURCE = ROOT / "src" / "codex_auto_resume" / "brand" / "days.py"
+CATALOGS = ROOT / "src" / "codex_auto_resume" / "locales"
+ASIDE = "status.aside"
+HIDDEN_PHRASES = ("pick it up", "이어 둘게요")
+
+
+def day_looks() -> dict:
+    """DAY_LOOKS as days.py writes it, read without importing the product."""
+    tree = ast.parse(DAYS_SOURCE.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "DAY_LOOKS" for t in node.targets):
+            return ast.literal_eval(node.value)
+    raise SystemExit("brand/days.py has no DAY_LOOKS")
+
+
+def hidden_words() -> tuple:
+    """Every word and phrase a release body may not name, longest first."""
+    words = set(HIDDEN_PHRASES)
+    for day, colours in day_looks().items():
+        words.update((day, day.replace("_", " "), day.replace("_", "-")))
+        words.update(colours)
+    for catalog in sorted(CATALOGS.glob("*.json")):
+        for key, value in json.loads(catalog.read_text(encoding="utf-8")).items():
+            if key == ASIDE or key.startswith(ASIDE + "_"):
+                words.add(key)
+                if isinstance(value, str) and "{" not in value and value.strip():
+                    words.add(value.strip())
+    return tuple(sorted(words, key=lambda word: (-len(word), word)))
+
+
+def hidden_named(body: str):
+    """The first special day or hidden press `body` names, whole and in any case, or None."""
+    for word in hidden_words():
+        if re.search(r"(?<!\w)%s(?!\w)" % re.escape(word), body, re.IGNORECASE):
+            return word
+    return None
 
 
 def main(argv=None) -> int:
