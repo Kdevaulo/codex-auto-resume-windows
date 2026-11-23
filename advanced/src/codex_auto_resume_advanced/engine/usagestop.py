@@ -127,7 +127,7 @@ class _StopErrand:
 class UsageStop(UsagePause):
     """usage_pause's code from v0.6.16-beta.4: the pause's holding, and the forced stop and its continuation after
     the reset. `stop`, `start` and `home` are seams a test fills (ipc.stop_turn, ipc.start_turn, the Codex home)."""
-    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff", "_stopped", "_unsure")
+    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff", "_stopped", "_unsure", "_missing")
 
     def __init__(self, paths, *, stop=None, start=None, home=None):
         super().__init__(paths)
@@ -138,6 +138,7 @@ class UsageStop(UsagePause):
         self._backoff = {}                   # {continuation: (failures, when it is asked again)}, in this process
         self._stopped = []                   # the windows stopped, (bucket, minutes, reset_at): once each per reset
         self._unsure = {}                    # {continuation: said}, its carried start perhaps not received (B4)
+        self._missing = {}                   # {continuation: since}, its conversation not found where it would carry
 
     # ---------------------------------------------------------------- reading Codex
     def _codex_home(self):
@@ -329,8 +330,9 @@ class UsageStop(UsagePause):
                     continue
                 if source.latest(thread) is None:
                     if found[0] == CARRY:
-                        self._message_gone(row, found[1])
+                        self._message_gone(row, found[1], now)
                     continue
+                self._missing.pop(row["record_id"], None)                    # back: the turn carries it (A3)
                 latest = turns.latest(thread)
             except Exception:
                 continue
@@ -407,18 +409,26 @@ class UsageStop(UsagePause):
         if latest is not None and latest.ordinal != row["ordinal"]:
             self._scoped.continuations.end(ContinuationReason.SUPERSEDED, thread_id=thread)
 
-    def _message_gone(self, row, rule) -> None:
-        """review4 V2: a message the stop's turn would carry, in a conversation core's reader no longer finds - archived
-        or gone - so no turn can start there. It is not kept waiting for ever: it ends as reset_message ends a message
-        that was not started (resetmsg.not_started), its words gone, and the person is told that the stopped
-        conversation could not be continued (`not_continued`)."""
+    def _message_gone(self, row, rule, now) -> None:
+        """review4 V2, review6 A3: a message the stop's turn would carry, in a conversation core's reader does not find
+        now - archived, or gone - so no turn can start there. It waits a day for the conversation to come back, the
+        grace core's own route gives a message it cannot send (DUE_FOR), and the person is told at once that the stopped
+        conversation could not be continued and goes on once it is open (`not_continued`): back within the day, the
+        stop's turn carries it. Only after the day does it end, as reset_message ends a message that waited too long
+        (resetmsg.expired; the page says "not sent: it waited too long"), its words gone. The day is counted in this
+        process: a restart counts it again, never shorter."""
+        from .resetmessage import DUE_FOR
+        first = self._missing.setdefault(row["record_id"], now)
+        if first == now:
+            self._count("not_continued")
+            self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
+        if now - first < DUE_FOR:
+            return
         try:
-            if self._scoped.resets.message_not_started(rule["rule_id"]) is not True:
-                return
+            if self._scoped.resets.message_expired(rule["rule_id"]) is True:
+                self._missing.pop(row["record_id"], None)
         except Exception:
             return
-        self._count("not_continued")
-        self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
 
     def _carry(self, row, rule, start, guard, now, failures) -> None:
         """v0.6.26 (review V1): the stop's turn after the reset, started as continuation `row`'s would be, carrying the
