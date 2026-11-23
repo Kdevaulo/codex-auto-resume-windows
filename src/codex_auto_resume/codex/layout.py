@@ -55,8 +55,11 @@ def snapshot(rows, codex_exe=None, seen=None) -> dict:
         rows = [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
         mains = pairing.app_mains(rows)
         found["mains"] = len(mains)
-        found["helpers"] = sum(1 for row in rows if pairing.app_process(row)) - len(mains)
         main = mains[0] if len(mains) == 1 else None
+        # Fourth round A1: a package program of a folder below `app` counts as a helper only under the main.
+        found["helpers"] = sum(1 for row in rows if pairing.app_process(row) and not any(row is each for each in mains)
+                               and (pairing._main_place(row["path"])
+                                    or (main is not None and pairing.under_app(rows, row, main["pid"]))))
         if main is not None:
             found["renamed_main"] = not pairing._package_app(main["path"])
             version = _VERSION.search(main["path"])
