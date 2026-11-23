@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 import re
 import time
 
@@ -40,8 +40,7 @@ _WORD = re.compile(r"[\x20-\x7e]{1,64}\Z")
 
 
 def _engine(row) -> bool:
-    return (isinstance(row, dict) and isinstance(row.get("path"), str)
-            and PureWindowsPath(row["path"]).name.lower() == "codex.exe")
+    return pairing.engine_row(row)
 
 
 def snapshot(rows, codex_exe=None, seen=None) -> dict:

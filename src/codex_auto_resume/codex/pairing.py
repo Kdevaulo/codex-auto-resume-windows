@@ -223,6 +223,15 @@ def _main_slot(path) -> bool:
     return bool(pattern.fullmatch(path))
 
 
+def engine_row(row) -> bool:
+    """Whether the inventory row `row` may be a Codex engine: a process of a file called codex.exe, whatever its case,
+    but not where the app's main is (`_main_slot`). v0.6.26 (fourth round A3): the package's `app\\Codex.exe` is its
+    update trampoline (an OpenAI-signed program of 20 KB, not an engine) or a main an update renamed (review K7) - never
+    paired as a server, counted among the engines the app serves, or run with --version as a candidate engine."""
+    return (isinstance(row, dict) and isinstance(row.get("path"), str)
+            and PureWindowsPath(row["path"]).name.lower() == "codex.exe" and not _main_slot(row["path"]))
+
+
 def app_process(row) -> bool:
     """Whether the inventory row `row` is a process of the Codex app's own package - a main or a helper: a ChatGPT.exe
     of the package (`_package_app`), as always, or (v0.6.26, update resilience #5) any other file of the package's
@@ -357,9 +366,7 @@ def server_engines(rows) -> frozenset:
     Codex desktop 26.1117 runs its app server under the package's utility process.
     """
     main = _app_main(rows)
-    return frozenset(row["path"] for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-                     and under_app(rows, row, main["pid"])
-                     and PureWindowsPath(row["path"]).name.lower() == "codex.exe")
+    return frozenset(row["path"] for row in rows if engine_row(row) and under_app(rows, row, main["pid"]))
 
 
 def app_engines() -> frozenset:
@@ -469,8 +476,7 @@ def session_kind(rows, user, codex_exe) -> bool:
     is no. Paths are compared, never kept (D2)."""
     if not isinstance(user, dict) or not isinstance(rows, list):
         return False
-    found = [row for row in rows if isinstance(row, dict) and row.get("pid") == user.get("pid")
-             and isinstance(row.get("path"), str) and PureWindowsPath(row["path"]).name.lower() == "codex.exe"]
+    found = [row for row in rows if engine_row(row) and row.get("pid") == user.get("pid")]
     if len(found) != 1 or found[0].get("parent") == os.getpid():
         return False
     row = found[0]
@@ -509,8 +515,7 @@ def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False, seen=No
     `session_kind`'s caller asks before it calls a conversation another session's (codex/transport.py).
     """
     main = _app_main(rows)
-    engines = [row for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-               and PureWindowsPath(row["path"]).name.lower() == "codex.exe" and under_app(rows, row, main["pid"])]
+    engines = [row for row in rows if engine_row(row) and under_app(rows, row, main["pid"])]
     servers = [row for row in engines if row["path"].lower() == str(codex_exe).lower()]
     others = [row for row in engines if row["path"].lower() != str(codex_exe).lower()]
     holder = None
@@ -520,8 +525,7 @@ def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False, seen=No
     elif len(servers) == 1 and codex_home is not None:
         holders = _database_holders(codex_home)
         held = _held(servers, holders)
-        codex_pids = {row.get("pid") for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-                      and PureWindowsPath(row["path"]).name.lower() == "codex.exe"}
+        codex_pids = {row.get("pid") for row in rows if engine_row(row)}
         if _held(others, holders) or (not held and any(each.get("pid") in codex_pids for each in holders)):
             raise AdapterError("desktop_server_missing_or_ambiguous")
         holder = held[0][1] if held else None
