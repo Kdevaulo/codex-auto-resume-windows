@@ -1838,6 +1838,10 @@ namespace CodexAutoResume
         private void AuditCodexChanged(Dictionary<string, object> snapshot, List<string> findings)
         {
             AuditedCodexChanged = 0;
+            // The counts the other audits keep of what they looked at stay theirs: these pages are looked at again here.
+            int hero = AuditedHero, lists = AuditedLists, shortest = AuditedShortest, alike = AuditedAlike, wraps = AuditedWraps,
+                band = AuditedBand;
+            string cards = AuditedCards;
             ApplySnapshot(WithCodexChanged(snapshot));
             foreach (string page in new[] { "overview", "pending", "diagnostics" })
             {
@@ -1879,6 +1883,13 @@ namespace CodexAutoResume
                 }
                 AuditedCodexChanged++;
             }
+            AuditedHero = hero;
+            AuditedLists = lists;
+            AuditedShortest = shortest;
+            AuditedAlike = alike;
+            AuditedWraps = wraps;
+            AuditedBand = band;
+            AuditedCards = cards;
         }
 
         /// The runs of `text` a line cannot break inside: between spaces and line ends, and never across a character of a
