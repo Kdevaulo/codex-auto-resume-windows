@@ -5,7 +5,6 @@ remembers. Nothing here draws - it answers which name to draw with.
 """
 from __future__ import annotations
 
-import contextlib
 import ctypes as C
 from ... import brand, l10n
 from ...win import typeface
@@ -122,20 +121,26 @@ def message_face():
 _PINNED = []
 
 
-@contextlib.contextmanager
-def windows_ui_face(face):
-    """Fonts made inside take `face` as Windows' UI font instead of asking this machine (v0.6.26, audit4 F1).
+class windows_ui_face:
+    """Fonts made inside `with windows_ui_face(face):` take `face` as Windows' UI font instead of asking this
+    machine (v0.6.26, audit4 F1). A class, not contextlib: the popup imports only what its safety test lists.
 
     For the pictures only: a popup, card or tip drawn for a picture on a Korean Windows was set in Malgun Gothic's
     Latin, where an English Windows sets it in Segoe UI. The generators stand in Segoe UI here, as the panel's picture
     does (make_screenshots: face=typeface.SEGOE) and the window's (RenderFont), and each language then takes the face
     its own Windows sets it in (`font_faces`: a script face for Korean, Japanese and Chinese; Segoe UI where that face
     lacks letters). The product never enters it, so its own choice is Windows' answer as before."""
-    _PINNED.append(face)
-    try:
-        yield face
-    finally:
+
+    def __init__(self, face):
+        self.face = face
+
+    def __enter__(self):
+        _PINNED.append(self.face)
+        return self.face
+
+    def __exit__(self, *_):
         _PINNED.pop()
+        return False
 
 
 def _ui_face():
