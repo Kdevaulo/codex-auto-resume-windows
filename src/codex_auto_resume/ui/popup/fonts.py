@@ -116,6 +116,38 @@ def message_face():
     return typeface.ui_face()
 
 
+# The face a picture stands in for Windows' UI font (`windows_ui_face`), innermost last; empty in the product, which
+# asks Windows every time.
+_PINNED = []
+
+
+class windows_ui_face:
+    """Fonts made inside `with windows_ui_face(face):` take `face` as Windows' UI font instead of asking this
+    machine (v0.6.26, audit4 F1). A class, not contextlib: the popup imports only what its safety test lists.
+
+    For the pictures only: a popup, card or tip drawn for a picture on a Korean Windows was set in Malgun Gothic's
+    Latin, where an English Windows sets it in Segoe UI. The generators stand in Segoe UI here, as the panel's picture
+    does (make_screenshots: face=typeface.SEGOE) and the window's (RenderFont), and each language then takes the face
+    its own Windows sets it in (`font_faces`: a script face for Korean, Japanese and Chinese; Segoe UI where that face
+    lacks letters). The product never enters it, so its own choice is Windows' answer as before."""
+
+    def __init__(self, face):
+        self.face = face
+
+    def __enter__(self):
+        _PINNED.append(self.face)
+        return self.face
+
+    def __exit__(self, *_):
+        _PINNED.pop()
+        return False
+
+
+def _ui_face():
+    """Windows' UI font for the fonts being made: the picture's stand-in inside `windows_ui_face`, else Windows'."""
+    return _PINNED[-1] if _PINNED else message_face()
+
+
 _LETTERS = {}
 
 
@@ -172,7 +204,7 @@ class _Fonts:
         self.key = (locale, scale)
         self.handles = {}
         self.faces = {}
-        system = message_face()                  # once for every role, so they cannot disagree
+        system = _ui_face()                      # once for every role, so they cannot disagree
         try:
             for role, (_, weight) in ROLES.items():
                 candidates = font_candidates(locale, weight, system, typeface.lacks)

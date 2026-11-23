@@ -1112,6 +1112,10 @@ function Get-PublishedPrereleases {
         With -Edition, an entry counts only when that edition's archive is among its uploaded assets, and its checksum
         too where the digest is not pinned - the rule the picker applies (Get-VersionVerdict): a pre-release whose archive
         is not uploaded yet was offered, said yes to, and downloaded to a 404 (v0.6.23 audit, N8). Without it, as before.
+
+        $TimeoutSec bounds the whole call, the reading of the entries too (v0.6.26 audit4 D2): a list whose entries take
+        longer than that to go through, or one entry with more than the 1,000 files GitHub lets a release carry, is a
+        throw - no list - and never a reader left running past the deadline it was given.
     #>
     param($Release, [int]$TimeoutSec = 15, [string]$Edition = '')
     foreach ($name in @('owner', 'repo', 'releases')) {
@@ -1119,9 +1123,11 @@ function Get-PublishedPrereleases {
             throw ('scripts/release.json has no "' + $name + '", so there is no list to read.')
         }
     }
+    $clock = [Diagnostics.Stopwatch]::StartNew()
     $list = Read-ReleasesPage -Release $Release -Uri $Release.releases -TimeoutSec $TimeoutSec
     $found = @()
     foreach ($entry in $list) {
+        if ($clock.Elapsed.TotalSeconds -gt $TimeoutSec) { throw 'The list of releases took longer to read than its deadline.' }
         if ($entry -isnot [Management.Automation.PSCustomObject]) { continue }
         $fields = $entry.PSObject.Properties
         if (-not $fields.Match('draft').Count -or -not $fields.Match('prerelease').Count -or
@@ -1135,12 +1141,16 @@ function Get-PublishedPrereleases {
         if ($Edition) {
             $template = Get-EditionRelease -Release $Release -Edition $Edition
             if (-not $fields.Match('assets').Count -or $null -eq $entry.assets -or $entry.assets -isnot [array]) { continue }
-            $names = @()
+            # GitHub lets a release carry 1,000 files; a list naming more is not GitHub's, and nothing of it is taken.
+            if ($entry.assets.Count -gt 1000) { throw 'The list of releases names more files on a release than GitHub allows.' }
+            $names = New-Object 'System.Collections.Generic.List[string]'
             foreach ($asset in $entry.assets) {
+                if ($clock.Elapsed.TotalSeconds -gt $TimeoutSec) { throw 'The list of releases took longer to read than its deadline.' }
                 if ($asset -isnot [Management.Automation.PSCustomObject]) { continue }
                 if (-not $asset.PSObject.Properties.Match('name').Count -or $asset.name -isnot [string]) { continue }
-                $names += ,$asset.name
+                $names.Add($asset.name)
             }
+            $names = $names.ToArray()
             $archive = $template.archive.Replace('{version}', $number)
             if ($names -cnotcontains $archive) { continue }
             if (-not (Get-PinnedDigest -Release $template -Version $number) -and $names -cnotcontains ($archive + '.sha256')) { continue }
@@ -1185,6 +1195,10 @@ function Get-ReleasePages {
         Get-ChosenVersion accepts, marked a pre-release exactly when its version is one, and has a
         list of assets; of the assets only their names are kept, and only names that are text. A version the list names twice is taken where it is named first.
         Each comes back as Version, Prerelease and Assets.
+
+        Each page's deadline, and $PickBudgetSeconds, bound the reading of its entries as well as its request (v0.6.26
+        audit4 D2): a page whose entries are not gone through by then, or an entry with more than the 1,000 files GitHub
+        lets a release carry, is a throw - nothing listed - never a reader left running past the window's wait.
     #>
     param($Release)
     foreach ($name in @('owner', 'repo', 'release_pages')) {
@@ -1202,8 +1216,11 @@ function Get-ReleasePages {
         $left = $PickBudgetSeconds - $clock.Elapsed.TotalSeconds
         $seconds = [int][Math]::Floor([Math]::Min([double]$PickPageTimeoutMax, $left))
         if ($seconds -lt $ReleasesTimeoutMin) { throw 'Too little time was left to read the rest of the list of releases.' }
+        # The page's own deadline, from before its request, and never past the whole call's.
+        $until = [Math]::Min($clock.Elapsed.TotalSeconds + $seconds, [double]$PickBudgetSeconds)
         $list = Read-ReleasesPage -Release $Release -Uri $template.Replace('{page}', [string]$page) -TimeoutSec $seconds
         foreach ($entry in $list) {
+            if ($clock.Elapsed.TotalSeconds -gt $until) { throw 'A page of the list of releases took longer to read than its deadline.' }
             if ($entry -isnot [Management.Automation.PSCustomObject]) { continue }
             $fields = $entry.PSObject.Properties
             if (-not $fields.Match('draft').Count -or -not $fields.Match('prerelease').Count -or
@@ -1216,13 +1233,17 @@ function Get-ReleasePages {
             try { $number = Get-ChosenVersion $tag.Substring(1) } catch { continue }
             if ($entry.prerelease -ne $number.Contains('-')) { continue }
             if ($null -eq $entry.assets -or $entry.assets -isnot [array]) { continue }
+            # GitHub lets a release carry 1,000 files; a list naming more is not GitHub's, and nothing of it is taken.
+            if ($entry.assets.Count -gt 1000) { throw 'The list of releases names more files on a release than GitHub allows.' }
             $last = $number
-            $names = @()
+            $kept = New-Object 'System.Collections.Generic.List[string]'
             foreach ($asset in $entry.assets) {
+                if ($clock.Elapsed.TotalSeconds -gt $until) { throw 'A page of the list of releases took longer to read than its deadline.' }
                 if ($asset -isnot [Management.Automation.PSCustomObject]) { continue }
                 if (-not $asset.PSObject.Properties.Match('name').Count -or $asset.name -isnot [string]) { continue }
-                $names += ,$asset.name
+                $kept.Add($asset.name)
             }
+            $names = $kept.ToArray()
             if ($seen.ContainsKey($number)) { continue }
             $seen[$number] = $true
             $found += ,([pscustomobject]@{ Version = $number; Prerelease = $entry.prerelease; Assets = $names })
