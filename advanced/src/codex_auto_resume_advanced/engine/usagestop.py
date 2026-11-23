@@ -101,8 +101,22 @@ class _StopErrand:
         self.code, self.view, self.targets, self.window = code, view, targets, window
 
     def run(self, guard):
-        if self.targets:
-            self.code.stop_all(self.targets, self.window, guard)
+        targets, window = self.targets, self.window
+        # matrix5 M1: the meter's errand may have saved a new reading in this very tick, after P8's tick marked what
+        # it read - a window newly over its stop percentage right after a reset. It is marked held here first, and its
+        # running turns stopped, so no turn starts into it below (`after_reset` asks holding()).
+        try:
+            newly = self.code._once(self.code._mark())
+        except Exception:
+            newly = []
+        if newly:
+            try:
+                targets = list(targets) + [found for found in self.code._running(self.view) if found not in targets]
+            except Exception:
+                pass
+            window = window or newly[0]
+        if targets:
+            self.code.stop_all(targets, window, guard)
         try:
             self.code.after_reset(self.view, guard)
         except Exception:
