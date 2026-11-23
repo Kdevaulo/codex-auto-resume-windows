@@ -171,6 +171,9 @@ _RECEIVERS = {
         "powerView": POWER_VIEW,
         "armed": _under(POWER_VIEW, ".armed"), "shown": _under(POWER_VIEW, ".shown"), "last": _under(POWER_VIEW, ".last"),
     },
+    # v0.6.26 (fourth-round design lead): the layout audit's Codex changed reply (WithCodexChanged) copies each pending
+    # row of the dashboard reply it is given and adds the codex_changed overlay to the row's own.
+    "gui/WindowAudit.cs": {"row": [("bridge:dashboard", "pending[]")]},
     # v0.6.15-beta: the Codex homes' card, beside what it has as a part of the Settings half (_spread).
     "gui/SettingsHomes.cs": {
         "view": [("bridge:status", "status.codex_homes"), ("bridge:dashboard", "status.codex_homes")],
