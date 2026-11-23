@@ -530,7 +530,9 @@ class WatchLoop:
             return None, None
         found = kept.get("layout") if isinstance(kept.get("layout"), dict) else {}
         app_open = (found.get("mains") or 0) > 0 or (found.get("helpers") or 0) > 0
-        untested = (kept.get("app_version") or kept.get("engine_version")
+        # Fourth round A4: the engine's `codex --version` line stands in for an app version that could not be read (two
+        # mains, a helper alone), as the version word the self-check keeps - never a text its readers refuse.
+        untested = (public.version_word(kept.get("app_version")) or public.version_word(kept.get("engine_version"))
                     if app_open and kept.get("catalogued") is False else None)
         updated = kept.get("updated_from") if kept.get("unpaired_after_update") is True else None
         return (untested if isinstance(untested, str) else None), (updated if isinstance(updated, str) else None)
