@@ -185,7 +185,10 @@ class PopupFrames:
                 gliding[("check", tasks[row - 1])] = amount
         moment = frame.t if light_at is None else light_at
         light = self.tray.halo(vm["light"], moment, moment, design=self.design)
-        hover = self.hovered(pointer, self.opening(frame)[1])
+        # `pointer` is in this picture's own pixels, and the picture is laid `below` its place while it rises
+        # (make_motion.make, its popup layer): the rise is already out of it, as the product hit-tests in the risen window's
+        # own coordinates. Taken out again, a pointer at a button's top was missed for the opening's 160 ms (audit4 F3).
+        hover = self.hovered(pointer)
         faces = self.faces(plan, hover, frame.t)
         with self.shots.pinned_face():
             if gliding or hover is not None or faces:
