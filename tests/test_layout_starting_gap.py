@@ -27,6 +27,7 @@ import test_pairing_roles as roles  # noqa: E402  (a module, so its cases are no
 STARTING = [roles.MAIN, roles.RENDERER]
 PAIRED = [roles.MAIN, roles.RENDERER, roles.row(20, 10, roles.ENGINE, 200)]
 HOURS = 3 * 3600.0
+RECORD_POLL = 60.0          # engine/options.py state_poll_seconds: a record waiting on the app is looked at again
 
 
 class GapTests(roles.Case):
@@ -76,6 +77,36 @@ class GapTests(roles.Case):
         self.assertIs(self.look(layout.snapshot(STARTING), 0.0), True)
         self.assertIs(self.look(layout.snapshot(STARTING), 900.0), False)
         self.assertIs(self.look(layout.snapshot(STARTING), 1800.0), False)
+
+    def drive(self, tick, until, wake_after=()):
+        """The real loop: `look` at every watcher tick with the backend's last snapshot, a fresh one only at the first
+        tick after the waiting record is due - every RECORD_POLL seconds (engine/options.py state_poll_seconds, the
+        poll of a record waiting on the app) - and, after each tick in `wake_after`, a Retry now wake a second later.
+        Returns {time: catalogued}."""
+        seen, snapshot, due, at = {}, None, 0.0, 0.0
+        while at <= until:
+            for when in (at, at + 1.0) if at in wake_after else (at,):
+                if when >= due:
+                    snapshot, due = layout.snapshot(STARTING), when + RECORD_POLL
+                seen[when] = self.look(snapshot, when)
+            at += tick
+        return seen
+
+    def test_one_record_waiting_on_a_starting_app_turns_at_every_tick_length(self):
+        """K8's own case (an app that stays "starting") with one record waiting at its real poll, the watcher ticking at
+        every pace its setting allows: it turns once ten minutes of looks have run, as before C3."""
+        for tick in (5.0, 30.0, 59.0, 61.0, 100.0, 300.0, 900.0, 3600.0):
+            with self.subTest(tick=tick):
+                self.setUp()
+                seen = self.drive(tick, 4 * 3600.0)
+                self.assertTrue(all(seen[when] for when in seen if when < 600.0))
+                self.assertFalse(seen[max(seen)], "never turned to not tested on")
+
+    def test_a_retry_now_wake_does_not_break_the_run(self):
+        """Fails with c24b93ea7's rule (two of the last tick): a wake a second after each tick made the last tick one
+        second, and each next fresh look, a 300-second tick later, began the count again - K8 never fired."""
+        seen = self.drive(300.0, 3600.0, wake_after=tuple(300.0 * n for n in range(13)))
+        self.assertFalse(seen[max(seen)])
 
     def test_a_gap_after_ticks_were_measured_begins_again(self):
         for tick in range(5):

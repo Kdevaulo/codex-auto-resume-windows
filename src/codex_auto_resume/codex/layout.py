@@ -35,10 +35,14 @@ SHAPES = {(1, 1, 0): "single_child", (1, 2, 0): "two_children", (1, 0, 1): "help
 # an update renamed, which the inventory does not list - looks "starting" for ever; past this many seconds of looks
 # that all found it so, it is a layout this version has not been tested on.
 STARTING_SECONDS = 600.0
-# Review C3: and only while the looks run on. A fresh look that comes longer after the one before than two of the
-# watcher's ticks (and at least LOOK_GAP_SECONDS) - or, before a tick has been measured, than twice STARTING_SECONDS -
-# begins the count again: an old "starting" look and a new one hours later are not one stretch of starting.
-LOOK_GAP_SECONDS = 120.0
+# Review C3: and only while the looks run on. A fresh snapshot comes only when a waiting record is looked at - every
+# engine/options.py state_poll_seconds (60) for one waiting on the app, at the first watcher tick after it is due, so
+# up to a minute plus one tick apart - while `look` is called at every tick. A fresh look that comes longer after the one
+# before than LOOK_GAP_SECONDS (five such polls) and three of the longest of the last TICKS_KEPT ticks - or, before a
+# tick has been measured, than twice STARTING_SECONDS - begins the count again: an old "starting" look and a new one
+# hours later are not one stretch of starting.
+LOOK_GAP_SECONDS = 300.0
+TICKS_KEPT = 8
 _VERSION = re.compile(r"OpenAI\.Codex_([0-9][0-9.]{0,31})_", re.I)
 _WORD = re.compile(r"[\x20-\x7e]{1,64}\Z")
 
@@ -168,7 +172,7 @@ class Watch:
         self._starting_since = None         # the first of the looks running that found the app "starting"
         self._untested = None               # whether the last look was one of a layout not tested on
         self._found, self._found_at = None, None    # the last snapshot looked at, and when it was first
-        self._called, self._tick = None, None       # when `look` was last called, and the time between the two before
+        self._called, self._ticks = None, []        # when `look` was last called, and the last TICKS_KEPT times between
         before = read(path) or {}
         self._kept = before
         self._key = None
@@ -187,10 +191,10 @@ class Watch:
         # engine checks makes a new one. A snapshot looked at again is no new look: it is judged as at its first look,
         # so one old "starting" look never runs out the K8 count.
         now, fresh = self.clock(), found is not self._found
-        allowed = 2 * STARTING_SECONDS if self._tick is None else max(LOOK_GAP_SECONDS, 2 * self._tick)
+        allowed = 2 * STARTING_SECONDS if not self._ticks else max(LOOK_GAP_SECONDS, 3 * max(self._ticks))
         run_on = fresh and self._found_at is not None and 0 <= now - self._found_at <= allowed
         if self._called is not None:
-            self._tick = now - self._called
+            self._ticks = (self._ticks + [max(0.0, now - self._called)])[-TICKS_KEPT:]
         self._called = now
         if fresh:
             self._found, self._found_at = found, now
