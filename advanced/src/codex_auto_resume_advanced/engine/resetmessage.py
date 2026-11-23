@@ -22,7 +22,9 @@ typed: nothing is filled in, and it is at most 2,000 characters unless Longer re
   state/resets.paced_wait), so all fifty that may wait are sent, twenty a day, and none expires for that pace.
   From v0.6.26 (review V1) one due in a conversation usage_pause stopped, whose continuation after that window's reset
   waits there, is not handed to core: the app paused that queue, and the stop's own turn after the reset carries the
-  message in that continuation's place (`carried_by_stop`, engine/usagestop.py).
+  message in that continuation's place (`carried_by_stop`, engine/usagestop.py) - whatever window the message was
+  written for (audit4 B3, the owner's answer of 2026-11-23: "carry it at the stop's own turn"). While the stop holds it,
+  it does not expire, and its day counts on from the hold's end (`_held_by_stop`).
 * P3 `usage`: a core record of the same conversation is held while one of its messages is due or in
   flight, and while one counts for the very reset that record waits for - so when a continuation and the
   person's message wait for the same reset, only the message is sent, in the continuation's place (the
@@ -67,17 +69,18 @@ PAUSE = "usage_pause"
 
 def carried_by_stop(rule, stops) -> bool:
     """Whether a message due is the forced stop's turn to carry (v0.6.26, review V1; the owner's answer of 2026-11-22,
-    "the reset message only"): usage_pause stopped its conversation and that stop's continuation after the reset of the
-    message's own window still waits there (`stops`, usage_pause's continuations still to go in that conversation). The
-    app paused that conversation's queue, and only the turn that continuation starts lets it go (codex/ipc.py, MIPC):
-    queued by core, the message would sit there for good. So it is not handed to core; the stop's turn after the reset
-    carries its words in that continuation's place, once (engine/usagestop.py). One that fell due before the stop is
-    not that turn's to carry."""
+    "the reset message only"): usage_pause stopped its conversation and that stop's continuation after the reset still
+    waits there (`stops`, usage_pause's continuations still to go in that conversation). The app paused that
+    conversation's queue, and only the turn that continuation starts lets it go (codex/ipc.py, MIPC): queued by core, the
+    message would sit there until that turn, behind the product's own continuation. So it is not handed to core; the
+    stop's turn after the reset carries its words in that continuation's place, once (engine/usagestop.py) - for a
+    message of either window (audit4 B3, the owner's answer of 2026-11-23: "carry it at the stop's own turn"), which then
+    waits for the stop's window. One that fell due before the stop is not that turn's to carry."""
     due = rule.get("due_at")
     if not isinstance(due, (int, float)) or isinstance(due, bool):
         return False
     return any(stop.get("capability") == PAUSE and stop.get("kind") == ContinuationKind.AFTER_RESET
-               and stop.get("thread_id") == rule.get("thread_id") and stop.get("chain") == rule.get("minutes")
+               and stop.get("thread_id") == rule.get("thread_id")
                and stop.get("finished_at") is None and stop.get("record_state") == RecordState.WAITING
                and stop.get("words") and isinstance(stop.get("created_at"), (int, float))
                and due >= stop["created_at"] for stop in stops)
@@ -233,16 +236,17 @@ class ResetMessage:
         return found
 
     def _ended(self, rule, view, now):
-        """(state, reason) a message not yet sent ends with now, or None."""
+        """(state, reason) a message not yet sent ends with now, or None. One the forced stop holds for its turn does not
+        expire, and one it held counts its day and its eight days from the hold's end (`_held_by_stop`, audit4 B3)."""
         try:
             on = view.thread_enabled(rule["thread_id"])
         except Exception:
             on = True                                    # what cannot be read cancels nothing
         if on is False:
             return RuleState.CANCELLED, RuleReason.CONVERSATION_OFF
-        if now - rule["created_at"] >= KEEP_FOR or (rule["due_at"] is not None
-                                                    and now - max(rule["due_at"], rule.get("waiting_since") or 0)
-                                                    >= DUE_FOR):
+        if (now - rule["created_at"] >= KEEP_FOR or (rule["due_at"] is not None
+                                                     and now - max(rule["due_at"], rule.get("waiting_since") or 0)
+                                                     >= DUE_FOR)) and not self._held_by_stop(rule, now):
             return RuleState.DONE, RuleReason.EXPIRED
         if rule["words"] is not None and len(rule["words"]) > SHORT_LIMIT and not self._scoped.armed(LONG):
             return RuleState.CANCELLED, RuleReason.TURNED_OFF
@@ -302,6 +306,25 @@ class ResetMessage:
             return carried_by_stop(rule, scoped.continuations_of(PAUSE, rule["thread_id"]))
         except Exception:
             return True
+
+    def _held_by_stop(self, rule, now) -> bool:
+        """audit4 B3: whether a message that would expire is held by the forced stop instead - carried by its turn after
+        the reset (`_stop_carries`), or let go by that stop less than DUE_FOR ago (its continuation finished after the
+        message fell due: carried by another message, ended by newer work, or the capability turned off). A message
+        held for days waiting for the stop's window is never deleted for that wait. Asked only of one about to expire."""
+        if rule["state"] != RuleState.READY or rule["record_state"] != RecordState.WAITING or not rule["words"]:
+            return False
+        if self._stop_carries(rule):
+            return True
+        due = rule.get("due_at")
+        try:
+            stops = self._scoped.continuations_of(PAUSE, rule["thread_id"], pending=None)
+        except Exception:
+            return False
+        return isinstance(due, (int, float)) and any(
+            stop.get("kind") == ContinuationKind.AFTER_RESET and isinstance(stop.get("created_at"), (int, float))
+            and isinstance(stop.get("finished_at"), (int, float)) and stop["created_at"] <= due <= stop["finished_at"]
+            and now - stop["finished_at"] < DUE_FOR for stop in stops)
 
     def _count(self, code) -> None:
         try:

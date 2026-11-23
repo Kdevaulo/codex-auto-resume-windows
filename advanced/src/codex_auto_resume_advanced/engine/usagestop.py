@@ -398,7 +398,7 @@ class UsageStop(UsagePause):
     def _message_instead(self, row, rows, now):
         """What of the person's reset messages stands for continuation `row` at the reset it waits for (R2, the owner's
         answer of 2026-11-22, "the reset message only"; review V1-V3) - one of reset_message's rules for that
-        conversation and that window, reset_message on:
+        conversation, of either window (audit4 B3), reset_message on:
         (CARRY, rule)   due since the stop, waiting with its words: the stop's turn carries it in the continuation's place
                         (`_carry`), for reset_message leaves it to that turn (resetmessage.carried_by_stop);
         (INSTEAD, rule) sent since the stop by that turn, or delivered: the continuation ends superseded;
@@ -410,8 +410,10 @@ class UsageStop(UsagePause):
                         first) may never go, and one counting for a later reset is not this one's: neither takes it."""
         scoped = self._scoped
         try:
+            # audit4 B3 (the owner's answer of 2026-11-23, "carry it at the stop's own turn"): every window's rules of the
+            # conversation - one written for the other window, due while the stop holds, is carried by this turn too.
             rules = [rule for rule in scoped.resets.reset_rules(capability=RESET_MESSAGE, pending=None)
-                     if rule.get("thread_id") == row["thread_id"] and rule.get("minutes") == row["chain"]]
+                     if rule.get("thread_id") == row["thread_id"]]
             counted = scoped.resets.windows() if rules else {}
             on = scoped.armed(RESET_MESSAGE) is True if rules else False
         except Exception:
