@@ -473,7 +473,7 @@ class ListingTests(unittest.TestCase):
     def test_each_page_is_one_get_with_no_redirect_followed_inside_the_budget(self):
         c = self.answer["constants"]
         self.assertEqual((c["PickPageSize"], c["PickMaxPages"], c["PickBudgetSeconds"], c["PickPageTimeoutMax"]),
-                         (30, MAX_PAGES, 400, 20))
+                         (30, MAX_PAGES, 400, 60))
         for name in PAGE_CASES:
             for call in listed(self.answer["pages"][name]["calls"]):
                 method, _, redirects, seconds, to_file = json.loads(call)
@@ -481,8 +481,10 @@ class ListingTests(unittest.TestCase):
                     self.assertEqual((method, redirects, to_file), ("Get", 0, False))
                     self.assertGreaterEqual(seconds, c["ReleasesTimeoutMin"])
                     self.assertLessEqual(seconds, c["PickPageTimeoutMax"])
-        self.assertLessEqual(c["PickMaxPages"] * c["PickPageTimeoutMax"], c["PickBudgetSeconds"],
-                             "a list that cannot be read is said within the window's wait")
+        # The owner, 2026-11-23 (audit4 F5): 60 s a page, and the run bounded by the budget alone - no longer twenty
+        # pages times a page's limit. A page's limit is never more than the budget; that the run ends by the budget is
+        # test_release_pages_budget's; the windows' waits, above the budget, test_release_pages_many's.
+        self.assertLessEqual(c["PickPageTimeoutMax"], c["PickBudgetSeconds"])
 
     def test_the_policy_is_any_of_its_values_under_either_key_or_a_key_that_cannot_be_read(self):
         for (case, expected), answer in zip(POLICY_CASES, self.answer["policy"]):

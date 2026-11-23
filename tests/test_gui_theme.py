@@ -1684,10 +1684,20 @@ class ThemeSourceRuleTests(unittest.TestCase):
         self.assertIn("internal static Func<bool> HighContrastOn = HighContrast;", controls)
         self.assertIn("on != null ? on() : HighContrast()", guiscan.member_body("Theme", "ContrastOn"))
         self.assertIn("Adopt(CodexAutoResume.Theme.ContrastOn() ?", controls)
+        # The one exception, stated (v0.6.26, fourth-round F2): the picture render stands its own answer, off, in that
+        # input as a probe does, so a picture is the same on any machine - never the contrast palette, never every glide
+        # cut. It is RenderFrames' alone, which runs only from a render job (RenderJob: null unless a capture's event,
+        # Soft.StillReady, and CODEX_AR_RENDER_PLAN name one), never in a window a person opens.
+        render = "Theme.HighContrastOn = delegate { return false; };"
         for name, text in self.sources.items():
             with self.subTest(name):
                 self.assertEqual(self.code(text).count("HighContrastOn ="),
-                                 1 if name == "gui/SoftTheme.cs" else 0)
+                                 1 if name in ("gui/SoftTheme.cs", "gui/WindowRender.cs") else 0)
+        self.assertIn(render, guiscan.member_body("SettingsForm", "RenderFrames"))
+        self.assertEqual(self.code(guiscan.read("WindowRender.cs")).count(render), 1)
+        render_code = guiscan.read("WindowRender.cs")
+        job = render_code[render_code.index("internal static string RenderJob"):render_code.index("catch (Exception) { return null; }")]
+        self.assertIn("if (Soft.StillReady == null) return null;", job)
         uses = sum(self.code(text).count("SystemInformation.HighContrast") for text in self.sources.values())
         self.assertEqual(uses, 1, "SystemInformation.HighContrast only as the fallback, where Windows cannot be asked")
         self.assertIn("SystemInformation.HighContrast", self.code(asked))

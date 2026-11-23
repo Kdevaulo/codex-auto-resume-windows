@@ -245,6 +245,19 @@ SELF_CHECK_FORMAT = "codex-auto-resume/selfcheck/1"
 # product's own it was updated from (#6, #11): letters, digits, dots and hyphens, at most this long.
 VERSION_MAX = 32
 _VERSION = re.compile(r"[0-9A-Za-z][0-9A-Za-z.\-]{0,%d}" % (VERSION_MAX - 1))
+_TOKEN = re.compile(r"(?<![0-9A-Za-z.\-])[0-9][0-9A-Za-z.\-]*")
+
+
+def version_word(text):
+    """The version a text names, as the self-check keeps one, or None: the text itself where it is one and has a digit,
+    or else its first word that starts with a digit - "codex-cli 0.171.0-alpha.13", `codex --version`'s line, is 0.171.0-alpha.13
+    (fourth round A4: where the app's version cannot be read, the engine's stands in)."""
+    if not isinstance(text, str):
+        return None
+    if _VERSION.fullmatch(text) and any(each.isdigit() for each in text):
+        return text
+    found = _TOKEN.search(text[:256])
+    return found.group(0) if found and _VERSION.fullmatch(found.group(0)) else None
 
 
 def self_check_note(started_at, word, unknown=None, layout=None, updated_from=None) -> dict:

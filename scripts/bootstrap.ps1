@@ -346,14 +346,17 @@ $AdvancedMarkSince = '0.6.17'
 # $PickMaxPages of them - a page with fewer ends it, and so does a full one whose last release is older
 # than $PickFloor, since the list is newest first and nothing past it is ever offered; a full last one
 # that ends neither way is no answer - and all of it within $PickBudgetSeconds, each page within
-# $PickPageTimeoutMax. The window waits longer than that for the answer. Twenty pages are 600
+# $PickPageTimeoutMax or what is left of the budget, whichever is less. The run is bounded by the budget
+# alone, not by pages times a page's limit (the owner, 2026-11-23, audit4 F5: 60 s a page, as a slow
+# network needs - 0.8 MB in 60 s is about 14 KB/s - where 20 s asked for about 40 KB/s; today three
+# pages are read). The window waits longer than the budget for the answer. Twenty pages are 600
 # published releases (v0.6.26; it was five, 150, and the 150th would have come around March 2027),
 # so about 590 above the floor list in full - some years at the pace since v0.5.0. Thirty to a page
 # is the page STANDARDS.md C3 names; a page of thirty of today's notes is about a fortieth of $ReleasesMaxChars.
 $PickPageSize = 30
 $PickMaxPages = 20
 $PickBudgetSeconds = 400
-$PickPageTimeoutMax = 20
+$PickPageTimeoutMax = 60
 # I12 as the owner amended it on 2026-10-03: its two pre-release clauses bind the update check's offer,
 # and a version picked by name and confirmed - a pre-release too, older or newer - follows "older only
 # with -Force", the confirmation being the yes. Both $false is I12 as it was written before: a
@@ -1112,6 +1115,10 @@ function Get-PublishedPrereleases {
         With -Edition, an entry counts only when that edition's archive is among its uploaded assets, and its checksum
         too where the digest is not pinned - the rule the picker applies (Get-VersionVerdict): a pre-release whose archive
         is not uploaded yet was offered, said yes to, and downloaded to a 404 (v0.6.23 audit, N8). Without it, as before.
+
+        $TimeoutSec bounds the whole call, the reading of the entries too (v0.6.26 audit4 D2): a list whose entries take
+        longer than that to go through, or one entry with more than the 1,000 files GitHub lets a release carry, is a
+        throw - no list - and never a reader left running past the deadline it was given.
     #>
     param($Release, [int]$TimeoutSec = 15, [string]$Edition = '')
     foreach ($name in @('owner', 'repo', 'releases')) {
@@ -1119,9 +1126,11 @@ function Get-PublishedPrereleases {
             throw ('scripts/release.json has no "' + $name + '", so there is no list to read.')
         }
     }
+    $clock = [Diagnostics.Stopwatch]::StartNew()
     $list = Read-ReleasesPage -Release $Release -Uri $Release.releases -TimeoutSec $TimeoutSec
     $found = @()
     foreach ($entry in $list) {
+        if ($clock.Elapsed.TotalSeconds -gt $TimeoutSec) { throw 'The list of releases took longer to read than its deadline.' }
         if ($entry -isnot [Management.Automation.PSCustomObject]) { continue }
         $fields = $entry.PSObject.Properties
         if (-not $fields.Match('draft').Count -or -not $fields.Match('prerelease').Count -or
@@ -1135,12 +1144,16 @@ function Get-PublishedPrereleases {
         if ($Edition) {
             $template = Get-EditionRelease -Release $Release -Edition $Edition
             if (-not $fields.Match('assets').Count -or $null -eq $entry.assets -or $entry.assets -isnot [array]) { continue }
-            $names = @()
+            # GitHub lets a release carry 1,000 files; a list naming more is not GitHub's, and nothing of it is taken.
+            if ($entry.assets.Count -gt 1000) { throw 'The list of releases names more files on a release than GitHub allows.' }
+            $names = New-Object 'System.Collections.Generic.List[string]'
             foreach ($asset in $entry.assets) {
+                if ($clock.Elapsed.TotalSeconds -gt $TimeoutSec) { throw 'The list of releases took longer to read than its deadline.' }
                 if ($asset -isnot [Management.Automation.PSCustomObject]) { continue }
                 if (-not $asset.PSObject.Properties.Match('name').Count -or $asset.name -isnot [string]) { continue }
-                $names += ,$asset.name
+                $names.Add($asset.name)
             }
+            $names = $names.ToArray()
             $archive = $template.archive.Replace('{version}', $number)
             if ($names -cnotcontains $archive) { continue }
             if (-not (Get-PinnedDigest -Release $template -Version $number) -and $names -cnotcontains ($archive + '.sha256')) { continue }
@@ -1185,15 +1198,24 @@ function Get-ReleasePages {
         Get-ChosenVersion accepts, marked a pre-release exactly when its version is one, and has a
         list of assets; of the assets only their names are kept, and only names that are text. A version the list names twice is taken where it is named first.
         Each comes back as Version, Prerelease and Assets.
+
+        Each page's deadline, and $PickBudgetSeconds, bound the reading of its entries as well as its request (v0.6.26
+        audit4 D2): a page whose entries are not gone through by then, or an entry with more than the 1,000 files GitHub
+        lets a release carry, is a throw - nothing listed - never a reader left running past the window's wait.
+
+        A page with more than $PickPageSize entries is a throw too (v0.6.26 review R1): GitHub never sends more than
+        the per_page it was asked for, and a list that long is what kept Get-VersionTable busy past every wait.
+        $Clock, when given, is the run's own stopwatch, which Get-VersionTable is held to afterwards.
     #>
-    param($Release)
+    param($Release, [Diagnostics.Stopwatch]$Clock = $null)
     foreach ($name in @('owner', 'repo', 'release_pages')) {
         if (-not $Release.PSObject.Properties.Match($name).Count) {
             throw ('scripts/release.json has no "' + $name + '", so there is no list to read.')
         }
     }
     $template = [string]$Release.release_pages
-    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $clock = $Clock
+    if ($null -eq $clock) { $clock = [Diagnostics.Stopwatch]::StartNew() }
     $found = @()
     $seen = @{}
     $ended = $false
@@ -1202,8 +1224,12 @@ function Get-ReleasePages {
         $left = $PickBudgetSeconds - $clock.Elapsed.TotalSeconds
         $seconds = [int][Math]::Floor([Math]::Min([double]$PickPageTimeoutMax, $left))
         if ($seconds -lt $ReleasesTimeoutMin) { throw 'Too little time was left to read the rest of the list of releases.' }
+        # The page's own deadline, from before its request, and never past the whole call's.
+        $until = [Math]::Min($clock.Elapsed.TotalSeconds + $seconds, [double]$PickBudgetSeconds)
         $list = Read-ReleasesPage -Release $Release -Uri $template.Replace('{page}', [string]$page) -TimeoutSec $seconds
+        if ($list.Count -gt $PickPageSize) { throw 'A page of the list of releases holds more releases than were asked for.' }
         foreach ($entry in $list) {
+            if ($clock.Elapsed.TotalSeconds -gt $until) { throw 'A page of the list of releases took longer to read than its deadline.' }
             if ($entry -isnot [Management.Automation.PSCustomObject]) { continue }
             $fields = $entry.PSObject.Properties
             if (-not $fields.Match('draft').Count -or -not $fields.Match('prerelease').Count -or
@@ -1216,13 +1242,17 @@ function Get-ReleasePages {
             try { $number = Get-ChosenVersion $tag.Substring(1) } catch { continue }
             if ($entry.prerelease -ne $number.Contains('-')) { continue }
             if ($null -eq $entry.assets -or $entry.assets -isnot [array]) { continue }
+            # GitHub lets a release carry 1,000 files; a list naming more is not GitHub's, and nothing of it is taken.
+            if ($entry.assets.Count -gt 1000) { throw 'The list of releases names more files on a release than GitHub allows.' }
             $last = $number
-            $names = @()
+            $kept = New-Object 'System.Collections.Generic.List[string]'
             foreach ($asset in $entry.assets) {
+                if ($clock.Elapsed.TotalSeconds -gt $until) { throw 'A page of the list of releases took longer to read than its deadline.' }
                 if ($asset -isnot [Management.Automation.PSCustomObject]) { continue }
                 if (-not $asset.PSObject.Properties.Match('name').Count -or $asset.name -isnot [string]) { continue }
-                $names += ,$asset.name
+                $kept.Add($asset.name)
             }
+            $names = $kept.ToArray()
             if ($seen.ContainsKey($number)) { continue }
             $seen[$number] = $true
             $found += ,([pscustomobject]@{ Version = $number; Prerelease = $entry.prerelease; Assets = $names })
@@ -1343,15 +1373,21 @@ function Get-VersionTable {
         from the list Get-ReleasePages read - with the newest release ($null where the list names
         none) and the update check's own offer: the rule of Get-NewerPrerelease applied to this list,
         the newest pre-release newer than both what is installed and the newest release.
+
+        With $Clock (the run's stopwatch, which Get-ReleasePages read the pages by), it throws once $PickBudgetSeconds
+        has passed (v0.6.26 review R1): a table is never made past the budget the window waits longer than.
     #>
-    param($Listed, [string]$Installed, [string]$InstalledEdition, $Release, [bool]$Policy)
+    param($Listed, [string]$Installed, [string]$InstalledEdition, $Release, [bool]$Policy,
+          [Diagnostics.Stopwatch]$Clock = $null)
     $latest = $null
     foreach ($entry in $Listed) {
+        if ($null -ne $Clock -and $Clock.Elapsed.TotalSeconds -gt $PickBudgetSeconds) { throw 'The list of releases took longer to go through than its budget.' }
         if ($entry.Prerelease) { continue }
         if ($null -eq $latest -or (Compare-ProductVersion -Left $entry.Version -Right $latest) -gt 0) { $latest = $entry.Version }
     }
     $offer = $null
     foreach ($entry in $Listed) {
+        if ($null -ne $Clock -and $Clock.Elapsed.TotalSeconds -gt $PickBudgetSeconds) { throw 'The list of releases took longer to go through than its budget.' }
         if (-not $entry.Prerelease) { continue }
         if ((Compare-ProductVersion -Left $entry.Version -Right $Installed) -le 0) { continue }
         if ($null -ne $latest -and (Compare-ProductVersion -Left $entry.Version -Right $latest) -le 0) { continue }
@@ -1363,14 +1399,17 @@ function Get-VersionTable {
     $otherEdition = 'advanced'
     if ($InstalledEdition -eq 'advanced') { $otherEdition = 'standard' }
     $editions = @($InstalledEdition, $otherEdition)
-    $rows = @()
+    if ($null -ne $Clock -and $Clock.Elapsed.TotalSeconds -gt $PickBudgetSeconds) { throw 'The list of releases took longer to go through than its budget.' }
+    $kept = New-Object 'System.Collections.Generic.List[object]'
     foreach ($entry in $sorted) {
+        if ($null -ne $Clock -and $Clock.Elapsed.TotalSeconds -gt $PickBudgetSeconds) { throw 'The list of releases took longer to go through than its budget.' }
         foreach ($edition in $editions) {
             $row = Get-VersionVerdict -Entry $entry -Edition $edition -Installed $Installed -InstalledEdition $InstalledEdition `
                                       -Release $Release -Policy $Policy -Offer $offer -Latest $latest
-            if ($null -ne $row) { $rows += ,$row }
+            if ($null -ne $row) { $kept.Add($row) }
         }
     }
+    $rows = @($kept.ToArray())
     return [pscustomobject]@{ Rows = $rows; Latest = $latest; Offer = $offer }
 }
 
@@ -2326,7 +2365,13 @@ if ($Versions) {
     }
     Step 'Asking api.github.com for this repository''s whole list of releases, page by page. Nothing is uploaded.'
     $listed = $null
-    try { $listed = Get-ReleasePages -Release $release }
+    $table = $null
+    $runClock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $listed = Get-ReleasePages -Release $release -Clock $runClock
+        $table = Get-VersionTable -Listed $listed -Installed $installed -InstalledEdition $installedEdition `
+                                  -Release $release -Policy (Get-PolicyInForce) -Clock $runClock
+    }
     catch {
         Fail ('The list of releases could not be read (' + $_.Exception.Message + ').')
         Write-ReleasesUnread
@@ -2334,8 +2379,6 @@ if ($Versions) {
         Step 'Nothing was changed.'
         exit $ExitUnavailable
     }
-    $table = Get-VersionTable -Listed $listed -Installed $installed -InstalledEdition $installedEdition `
-                              -Release $release -Policy (Get-PolicyInForce)
     foreach ($row in $table.Rows) {
         Write-Host ('version: ' + $row.Version + ' ' + $row.Edition + ' ' + $row.Answer + ' ' + $row.Detail)
     }
@@ -2405,7 +2448,13 @@ if ($Pick) {
     }
     Step 'Asking api.github.com for this repository''s whole list of releases again, page by page. Nothing is uploaded.'
     $listed = $null
-    try { $listed = Get-ReleasePages -Release $release }
+    $table = $null
+    $runClock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $listed = Get-ReleasePages -Release $release -Clock $runClock
+        $table = Get-VersionTable -Listed $listed -Installed ([string]$installed) -InstalledEdition $installedEdition `
+                                  -Release $release -Policy (Get-PolicyInForce) -Clock $runClock
+    }
     catch {
         Fail ('The list of releases could not be read (' + $_.Exception.Message + ').')
         Write-ReleasesUnread
@@ -2413,8 +2462,6 @@ if ($Pick) {
         Step 'Nothing was downloaded, and nothing was changed.'
         exit $ExitUnavailable
     }
-    $table = Get-VersionTable -Listed $listed -Installed ([string]$installed) -InstalledEdition $installedEdition `
-                              -Release $release -Policy (Get-PolicyInForce)
     $rows = @($table.Rows | Where-Object { $_.Version -ceq $picked -and $_.Edition -ceq $pickEdition })
     $words = @()
     if ($rows.Count -eq 1 -and $rows[0].Answer -ceq 'offered') { $words = @($rows[0].Detail.Split(',')) }

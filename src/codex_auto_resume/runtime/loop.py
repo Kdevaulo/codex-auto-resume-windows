@@ -22,10 +22,7 @@ from pathlib import Path
 
 from .. import compatio, config, failures, l10n, machine, power
 from ..codex.pairing import app_running_now
-try:
-    from ..codex import layout as codex_layout          # v0.6.26: the layout seat's (codex/layout.py)
-except ImportError:                                     # pragma: no cover - a tree without it says nothing of it
-    codex_layout = None
+from ..codex import layout as codex_layout
 from ..codex.paths import DB_KINDS, newest_generation
 from ..domain import public
 from ..engine import impossible
@@ -507,7 +504,12 @@ class WatchLoop:
         except Exception:
             self._record_failure("the self-check")
             judge.look(now, None, {})
-        untested, updated = self._layout_said()
+        try:
+            untested, updated = self._layout_said()
+        except Exception:
+            # Audit-standards E2: what the layout file holds never ends the watcher; it costs the look alone.
+            self._record_failure("the self-check")
+            untested = updated = None
         written = public.self_check_note(started, judge.word(now), getattr(self, "_unknown_error", None),
                                          untested, updated)
         if written != getattr(self, "_self_check_written", None):
@@ -523,22 +525,23 @@ class WatchLoop:
         """#6 and #11: (Codex's version where the app runs in a layout this version has not been tested on, the version
         of this product it was updated from where no look since has paired a server and that version's did), each None
         - read from what the watcher keeps of the layout (codex/layout.py, Paths.codex_layout_file), never a path."""
-        # Paths.codex_layout_file is the layout seat's too (config/codex-layout.json).
-        path = getattr(self.paths, "codex_layout_file", self.paths.state_dir / "codex-layout.json")
-        kept = codex_layout.read(path) if codex_layout is not None else None
+        kept = codex_layout.read(self.paths.codex_layout_file)
         if not isinstance(kept, dict):
             return None, None
         found = kept.get("layout") if isinstance(kept.get("layout"), dict) else {}
-        app_open = (found.get("mains") or 0) > 0 or (found.get("helpers") or 0) > 0
-        untested = (kept.get("app_version") or kept.get("engine_version")
+        app_open = any(type(found.get(name)) is int and found[name] > 0 for name in ("mains", "helpers"))
+        # Fourth round A4: the engine's `codex --version` line stands in for an app version that could not be read (two
+        # mains, a helper alone), as the version word the self-check keeps - never a text its readers refuse.
+        untested = (public.version_word(kept.get("app_version")) or public.version_word(kept.get("engine_version"))
                     if app_open and kept.get("catalogued") is False else None)
         updated = kept.get("updated_from") if kept.get("unpaired_after_update") is True else None
         return (untested if isinstance(untested, str) else None), (updated if isinstance(updated, str) else None)
 
     def _unknown_errors(self, engine, now):
         """#10: the newest error code Codex reported in the last day that this version does not know, with how many of
-        the conversations' latest turns failed with one ({"code", "count"}), or None - read once a minute from the
-        failures' shapes alone (failures.unknown_code), never a word of a message. Nothing is recovered for them."""
+        the conversations' latest turns failed with that code in the last day ({"code", "count"}; review R4: that code
+        only, as B9 says - an older reader shows the same two fields), or None - read once a minute from the failures'
+        shapes alone (failures.unknown_code), never a word of a message. Nothing is recovered for them."""
         try:
             read = engine.source.latest_failures(max(0.0, now - 86400.0), admissible=True, shapes=True)
         except Exception:
@@ -546,7 +549,10 @@ class WatchLoop:
             return getattr(self, "_unknown_error", None)
         found = [(entry.get("completed_at") or 0, code) for entry in read
                  for code in [failures.unknown_code(entry)] if code is not None]
-        return {"code": max(found)[1], "count": len(found)} if found else None
+        if not found:
+            return None
+        newest = max(found)[1]
+        return {"code": newest, "count": sum(1 for _, code in found if code == newest)}
 
     def _recovery_facts(self, store, engine):
         """(app runs, {rule: held}) for one look of the recovery rules (impossible.recovery_facts): asked only while a

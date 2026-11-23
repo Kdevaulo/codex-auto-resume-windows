@@ -158,9 +158,11 @@ class CardFrames:
         self.scale = scale
         where = {"dpi": int(round(96 * scale)), "work": (0, 0, 0, 0), "monitor": (0, 0, 0, 0), "anchor": None}
         drawn = {"theme": theme, "design": design or brand.DEFAULT_DESIGN, "contrast": False, "reduced": False}
+        self._pinned = make_screenshots.pinned_face      # the stills' face (F1)
         try:
-            self.card = notice_window.Card(make_screenshots._NoStack(), make_screenshots.card_notice(locale),
-                                           now_ms=0, where=where, drawn=drawn, windows=False)
+            with self._pinned():
+                self.card = notice_window.Card(make_screenshots._NoStack(), make_screenshots.card_notice(locale),
+                                               now_ms=0, where=where, drawn=drawn, windows=False)
         except BaseException:
             self.close()
             raise
@@ -199,6 +201,10 @@ class CardFrames:
     def drawn(self, t: float, born: float, *, hover=None, pressed=None, leave=None, light=None) -> Drawn | None:
         """The card at `t`, born at `born`, leaving from `leave` (or not), with `hover` / `pressed` naming a button by
         its verb; None once it has gone. `light` pins the moment its light is drawn at, for a test."""
+        with self._pinned():
+            return self._drawn(t, born, hover=hover, pressed=pressed, leave=leave, light=light)
+
+    def _drawn(self, t, born, *, hover, pressed, leave, light):
         from codex_auto_resume import notice_card
         card = self.card
         motion = notice_card.CardMotion(born, hold_ms=FOREVER_MS)

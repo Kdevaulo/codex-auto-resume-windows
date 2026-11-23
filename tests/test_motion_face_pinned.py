@@ -24,7 +24,8 @@ class PinnedFaceTests(unittest.TestCase):
     def test_the_dashboard_drawn_for_a_picture_starts_from_segoe_ui(self):
         body = guiscan.member_body("SettingsForm", "RenderFont")
         self.assertIn("if (!RenderPinned) return null;", body, "a render that pins no scale keeps the machine's font")
-        self.assertIn("new Font(Typeface.Segoe, box.SizeInPoints, box.Style", body)
+        # v0.6.26 (fourth-round F2): at Windows' default size and style, not this machine's (test_render_machine_pins).
+        self.assertIn("new Font(Typeface.Segoe, RenderPoints, FontStyle.Regular", body)
         self.assertIn("AtDisplayScale(TextScale.Apply(face, textRead, TextSize))", body,
                       "at the size the window's own font is made at")
         opened = guiscan.member_body("SettingsForm", "OpenForRender")
@@ -40,7 +41,7 @@ class PinnedFaceTests(unittest.TestCase):
     def test_the_setup_window_drawn_for_a_picture_starts_from_segoe_ui(self):
         shim = (ROOT / "build" / "motion" / "InstallerRender.cs").read_text(encoding="utf-8")
         pinned = shim[shim.index("if (scale >= 0.5)"):shim.index("else", shim.index("if (scale >= 0.5)"))]
-        self.assertRegex(pinned, r"font = new Font\(Typeface\.Segoe, box\.SizeInPoints \* SettingsForm\.FontFactor")
+        self.assertRegex(pinned, r"font = new Font\(Typeface\.Segoe, RenderPoints \* SettingsForm\.FontFactor")
         self.assertNotRegex(re.sub(r"if \(!string\.Equals[^;]*;", "", pinned),
                             r"font = new Font\(box\.FontFamily", "the machine's face only where Segoe UI is missing")
 

@@ -71,7 +71,8 @@ class TipFrames:
             snapshot = self.snapshot()
             parts = self.words.tooltip_parts(snapshot, self.strings, now, None)
             light = self.tipcard.tip_light(snapshot, now)
-            plan = self.renderer.tip_layout(parts, light, self.scale, self.locale)
+            with self.shots.pinned_face():      # the popup's stills' face (make_screenshots.pinned_face, F1)
+                plan = self.renderer.tip_layout(parts, light, self.scale, self.locale)
             where = self.tipcard.tip_place(plan, self.work, self.monitor, self.box)
             self._plans[shift] = (plan, light, where)
         return self._plans[shift]
@@ -98,11 +99,12 @@ class TipFrames:
         plan, light, where = self.reading(shift)
         since = frame.t - dict(frame.tip)["born"]
         halo = self.tray.halo(light, since, since, design=self.design)
-        if self._held == shift:
-            self.renderer.draw_tip_light(plan, halo)
-        else:
-            self.renderer.draw_tip(plan, halo)
-            self._held = shift
+        with self.shots.pinned_face():
+            if self._held == shift:
+                self.renderer.draw_tip_light(plan, halo)
+            else:
+                self.renderer.draw_tip(plan, halo)
+                self._held = shift
         pixels = bytes(self.renderer.canvas.pixels())
         return self.shots.clear_rgba(pixels), tuple(plan["size"]), where, self.alpha(frame)
 

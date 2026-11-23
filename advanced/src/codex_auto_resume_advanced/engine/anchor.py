@@ -835,6 +835,11 @@ class WindowAnchor:
             # "trying again every 5 minutes" meanwhile (`_show_retry`).
             held["next"] = max(held["next"], longer - WINDOW_SECONDS + RETRY_EVERY)
         held["weekly"] = weekly
+        if reason == "ceiling":
+            if "wake" not in held:
+                held["wake"] = self._ceiling_frees(now)
+        else:
+            held.pop("wake", None)
         if now >= held["until"]:
             return self._span_ended(occasion, now)
         self._show_next()
@@ -884,12 +889,39 @@ class WindowAnchor:
         else:
             self._stamp(OptionKey.ANCHOR_RETRY_UNTIL, until)
 
+    def _ceiling_frees(self, now):
+        """When its ceiling of starts a day lets a start go again (audit4 B2): the first minute past `now` at which fewer
+        than the ceiling's starts are counted in the day before - found once for a hold, for no start is made while the
+        ceiling holds. None where that is not within a day or cannot be read."""
+        from ..registry import WINDOW_ANCHOR
+        most = WINDOW_ANCHOR.ceilings.per_day
+
+        def full(at):
+            made = self._scoped.counted_since("started", at - DAY)
+            return type(made) is not int or made >= most
+        try:
+            low, high = int(now), int(now) + DAY
+            if full(high):
+                return None
+            while high - low > 60:
+                middle = (low + high) // 2
+                if full(middle):
+                    low = middle
+                else:
+                    high = middle
+            return high
+        except Exception:
+            return None
+
     def _show_next(self) -> None:
         """The next look of an occasion held open, stamped for wake_for_reset (v0.6.26, audit A3): the hold lives in this
         process's memory, and a PC asleep at that look - a full weekly window's reset above all - is woken for it as for
         the reset it waits for (engine/wake.py, `_anchor_due`). Written only when it changes; taken away when nothing is
-        held open."""
-        nexts = [held["next"] for held in self._held_open.values() if held["next"] != float("inf")]
+        held open. Only the occasion's own time is a wake time (audit4 B2): the look past a full weekly window's reset,
+        and the minute a ceiling's hold frees (`_ceiling_frees`) - never a RETRY_EVERY retry of a passing failure, which
+        woke a sleeping PC every five minutes for up to five hours (a day for a ceiling)."""
+        nexts = [held["next"] if held.get("weekly") else held.get("wake") for held in self._held_open.values()]
+        nexts = [at for at in nexts if isinstance(at, (int, float)) and not isinstance(at, bool) and at != float("inf")]
         found = int(min(nexts)) if nexts else None
         if found == self._shown_next:
             return

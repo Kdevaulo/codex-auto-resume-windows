@@ -16,6 +16,8 @@ would have pointed one folder too high.
 from __future__ import annotations
 
 import argparse
+import ast
+import json
 import posixpath
 from pathlib import Path
 import re
@@ -163,9 +165,106 @@ def download_block(version: str) -> str:
             % (link("Standard", "standard"), link("Advanced", "advanced"), REPO))
 
 
+# The longest release body this project publishes (the car-release checklist's rule, held here since v0.6.26, audit4 F4):
+# GitHub itself refuses a body over 125,000 characters, and only once the release is being made; the margin keeps a body
+# that grows on the way clear of that refusal. The largest so far is v0.6.11's, 58,350 characters.
+BODY_MAX = 100000
+
+
 def notes(text: str, version: str) -> str:
-    """The release body: the download block, a blank line, then the rebased changelog section."""
-    return download_block(version) + "\n" + rebase(section(text, version))
+    """The release body: the download block, a blank line, then the rebased changelog section.
+
+    Refused (ValueError) over BODY_MAX characters, so the release workflow stops at its notes step, before anything is
+    published, rather than at GitHub's refusal."""
+    body = download_block(version) + "\n" + rebase(section(text, version))
+    if len(body) > BODY_MAX:
+        raise ValueError("the release notes of %s are %d characters, over the %d a release body may have: shorten "
+                         "the changelog entry" % (version, len(body), BODY_MAX))
+    named = hidden_named(body)
+    if named:
+        raise ValueError("the release notes of %s name %r, a special day or a hidden press, which stay out of every "
+                         "release body: take it out of the changelog entry" % (version, named))
+    return body
+
+
+# The special days and the hidden presses stay out of the release notes as out of every document (the owner, 2026-11-16;
+# audit4 F4). The words are taken from the code, not written here: brand/days.py's DAY_LOOKS (each day's name, as written
+# and with a space or a hyphen for its underscore, and its colours), the catalogs' status.aside keys and every sentence
+# they give in every language, and the phrases tests/test_gui_v0623_days.py already keeps out of the documents
+# (HIDDEN_PHRASES, held to that test by tests/test_release_notes_hidden.py). A word counts only whole, in any case, so
+# "day", "press" or "Monday" are never refused.
+DAYS_SOURCE = ROOT / "src" / "codex_auto_resume" / "brand" / "days.py"
+CATALOGS = ROOT / "src" / "codex_auto_resume" / "locales"
+ASIDE = "status.aside"
+HIDDEN_PHRASES = ("pick it up", "이어 둘게요")
+
+
+def day_looks() -> dict:
+    """DAY_LOOKS as days.py writes it, read without importing the product."""
+    tree = ast.parse(DAYS_SOURCE.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "DAY_LOOKS" for t in node.targets):
+            return ast.literal_eval(node.value)
+    raise SystemExit("brand/days.py has no DAY_LOOKS")
+
+
+def hidden_words() -> tuple:
+    """Every word and phrase a release body may not name, longest first."""
+    words = set(HIDDEN_PHRASES)
+    for day, colours in day_looks().items():
+        words.update((day, day.replace("_", " "), day.replace("_", "-")))
+        words.update(colours)
+    for catalog in sorted(CATALOGS.glob("*.json")):
+        for key, value in json.loads(catalog.read_text(encoding="utf-8")).items():
+            if key == ASIDE or key.startswith(ASIDE + "_"):
+                words.add(key)
+                if isinstance(value, str) and "{" not in value and value.strip():
+                    words.add(value.strip())
+    return tuple(sorted(words, key=lambda word: (-len(word), word)))
+
+
+# What the words alone miss (v0.6.26 review R2): a plain description of a press, or a day's name inflected or spelled
+# apart. From the egg code (gui/SoftEggs.cs: its header calls them "the version's easter eggs", PressRun plays the special
+# one at the sixth press - Wanted = 6 - and ConfettiBurst throws the confetti) and the day tables (DAY_LOOKS' names and
+# the Korean names the ko catalog's status.aside_day_* sentences give them). Each pattern is matched whole, in any case.
+# Allowed on purpose, since real entries need them: "six" and "sixth" alone (page counts, "six hours"), "hidden",
+# "surprise", "press" and "pressed" alone, and the Korean "여섯 번" alone (counts in three entries); only a press
+# counted to six is refused.
+PRESS_PATTERNS = (
+    r"easter[\s-]*eggs?", r"eggs?", r"confetti",
+    r"six\s+(?:times|presses|clicks|taps)", r"sixth\s+(?:press|click|tap)",
+    r"press(?:es|ed|ing)?\s+(?:\w+\s+){0,3}six", r"press(?:es|ed|ing)?\s+(?:on\s+)?the\s+version",
+    # Korean takes its particles and endings on the word itself (추석에, 이스터에그를, 누르면): what follows is let be.
+    r"이스터\s*에그\w*", r"콘페티\w*",
+    r"여섯\s*번(?:째)?\s*(?:누르|눌러|누름|클릭)\w*",
+)
+# The Korean names of the days, as the ko catalog's status.aside_day_* sentences name them: 생일, 새해, 크리스마스,
+# 설날, 추석 - with whatever particle follows (설날에), but never inside another word (발생일).
+KOREAN_DAYS = ("생일", "새해", "크리스마스", "설날", "추석")
+
+
+def day_pattern(day: str) -> str:
+    """A day's name with its letters spelled apart or not (`Seol-lal`, `newyear`) and its plural or possessive."""
+    parts = [r"[\s-]?".join(re.escape(letter) for letter in part) for part in day.split("_")]
+    return r"[\s_-]*".join(parts) + "(?:e?s|['’]s)?"
+
+
+def hidden_patterns() -> tuple:
+    """(what it names, the pattern) for every day's name, every press described and every word of hidden_words."""
+    found = [(day, day_pattern(day)) for day in day_looks()]
+    found += [(pattern, pattern) for pattern in PRESS_PATTERNS]
+    found += [(name, re.escape(name) + r"\w*") for name in KOREAN_DAYS]
+    found += [(word, re.escape(word)) for word in hidden_words()]
+    return tuple(found)
+
+
+def hidden_named(body: str):
+    """The first special day or hidden press `body` names, whole and in any case, or None: the text it found."""
+    for _name, pattern in hidden_patterns():
+        match = re.search(r"(?<!\w)(?:%s)(?!\w)" % pattern, body, re.IGNORECASE)
+        if match:
+            return match.group(0)
+    return None
 
 
 def main(argv=None) -> int:
@@ -178,7 +277,14 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     text = Path(args.changelog).read_text(encoding="utf-8")
-    body = release_title(text, args.version) if args.title else notes(text, args.version)
+    if args.title:
+        body = release_title(text, args.version)
+    else:
+        try:
+            body = notes(text, args.version)
+        except ValueError as refused:
+            print("release_notes: %s" % refused, file=sys.stderr)
+            return 1
     if args.output:
         with open(args.output, "w", encoding="utf-8", newline="\n") as output:
             output.write(body + "\n")
