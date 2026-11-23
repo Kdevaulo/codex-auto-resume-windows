@@ -539,8 +539,9 @@ class WatchLoop:
 
     def _unknown_errors(self, engine, now):
         """#10: the newest error code Codex reported in the last day that this version does not know, with how many of
-        the conversations' latest turns failed with one ({"code", "count"}), or None - read once a minute from the
-        failures' shapes alone (failures.unknown_code), never a word of a message. Nothing is recovered for them."""
+        the conversations' latest turns failed with that code in the last day ({"code", "count"}; review R4: that code
+        only, as B9 says - an older reader shows the same two fields), or None - read once a minute from the failures'
+        shapes alone (failures.unknown_code), never a word of a message. Nothing is recovered for them."""
         try:
             read = engine.source.latest_failures(max(0.0, now - 86400.0), admissible=True, shapes=True)
         except Exception:
@@ -548,7 +549,10 @@ class WatchLoop:
             return getattr(self, "_unknown_error", None)
         found = [(entry.get("completed_at") or 0, code) for entry in read
                  for code in [failures.unknown_code(entry)] if code is not None]
-        return {"code": max(found)[1], "count": len(found)} if found else None
+        if not found:
+            return None
+        newest = max(found)[1]
+        return {"code": newest, "count": sum(1 for _, code in found if code == newest)}
 
     def _recovery_facts(self, store, engine):
         """(app runs, {rule: held}) for one look of the recovery rules (impossible.recovery_facts): asked only while a
