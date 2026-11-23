@@ -16,8 +16,9 @@ message in a conversation the forced stop paused that now waits for every limit 
 the second is the advanced edition's alone.
 
 **Going back.** Nothing that an earlier version reads changes shape: `selfcheck.json` keeps its form, only the count it holds is now the
-code's own. The advanced edition now marks a carried start it could not confirm in a field its forced-stop continuations already had and
-never used; v0.6.26-beta does not read it there, so going back inside that wait takes the start as sent.
+code's own. In the advanced edition, a forced stop kept with Continue after the reset off is a hold with no words, so no earlier
+version you go back to starts the continuation you turned off; and a carried start the app may not have received gives up the
+continuation's words with its doubt, so v0.6.25 and v0.6.26-beta start nothing beside the message.
 
 ### Both editions
 
@@ -64,9 +65,10 @@ never used; v0.6.26-beta does not read it there, so going back inside that wait 
   the stop paused and never sent into a window still over its stop percentage; it does not expire while it waits, and its day counts
   from when the stop lets it go.
 - **With Continue after the reset off, the stop's turn still carries such a message**, and starts only for it; without a message nothing
-  goes, as before.
+  goes, as before. If Continue after the reset is turned off after the stop, the person is asked at the reset to press Resume.
 - **A Resume before the reset ends the stop's hold at the next look**, and the message then goes by the reset message's usual route at
-  its own reset. A held message in a conversation that was archived or is gone ends as not started, and the near-limit notice says so.
+  its own reset. A held message in a conversation archived at the reset waits a day for it to come back: if it does, the stop's turn carries
+  it; otherwise it ends as one that waited too long, which the page shows as "not sent: it waited too long".
 - **A carried start the app may not have received waits one backoff for its turn**, and without one the person is asked once to press
   Resume; the message is never sent twice. The doubt is kept in the state, so a watcher restarted inside the backoff still asks.
 - **The stop marks the windows its tick's reading shows over before a turn may start after the reset**, so the stop's turn no longer
