@@ -251,6 +251,8 @@ jobs:
       - name: Check the advanced setup program carries its archive and is reproducible
         run: python build/make_setup.py --check --edition advanced
 
+      # release_notes.py refuses a body over 100,000 characters (its BODY_MAX) and exits 1: notes that long stop the
+      # release here, before anything is published, not at GitHub's own refusal at 125,000.
       - name: Extract the release notes
         env:
           VERSION: ${{ steps.version.outputs.version }}

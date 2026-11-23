@@ -163,9 +163,22 @@ def download_block(version: str) -> str:
             % (link("Standard", "standard"), link("Advanced", "advanced"), REPO))
 
 
+# The longest release body this project publishes (the car-release checklist's rule, held here since v0.6.26, audit4 F4):
+# GitHub itself refuses a body over 125,000 characters, and only once the release is being made; the margin keeps a body
+# that grows on the way clear of that refusal. The largest so far is v0.6.11's, 58,350 characters.
+BODY_MAX = 100000
+
+
 def notes(text: str, version: str) -> str:
-    """The release body: the download block, a blank line, then the rebased changelog section."""
-    return download_block(version) + "\n" + rebase(section(text, version))
+    """The release body: the download block, a blank line, then the rebased changelog section.
+
+    Refused (ValueError) over BODY_MAX characters, so the release workflow stops at its notes step, before anything is
+    published, rather than at GitHub's refusal."""
+    body = download_block(version) + "\n" + rebase(section(text, version))
+    if len(body) > BODY_MAX:
+        raise ValueError("the release notes of %s are %d characters, over the %d a release body may have: shorten "
+                         "the changelog entry" % (version, len(body), BODY_MAX))
+    return body
 
 
 def main(argv=None) -> int:
@@ -178,7 +191,14 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     text = Path(args.changelog).read_text(encoding="utf-8")
-    body = release_title(text, args.version) if args.title else notes(text, args.version)
+    if args.title:
+        body = release_title(text, args.version)
+    else:
+        try:
+            body = notes(text, args.version)
+        except ValueError as refused:
+            print("release_notes: %s" % refused, file=sys.stderr)
+            return 1
     if args.output:
         with open(args.output, "w", encoding="utf-8", newline="\n") as output:
             output.write(body + "\n")
