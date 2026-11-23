@@ -21,9 +21,8 @@ asks the person to press Resume in Codex.
 v0.6.26 (R2, review V1): where reset_message is on and the person's own message for that conversation falls due at that
 very reset, that turn carries the message's words and its marker instead of the continuation's - the person's message
 goes, once, and the turn lets the paused queue go; reset_message leaves such a message to it (resetmessage.carried_by_stop)
-rather than queuing it into the paused queue, where it would sit for good. That turn carries it once the
-continuation's own window has reset, even while another window still holds (audit4 B1): the pause never holds a person's
-message, only its own continuation.
+rather than queuing it into the paused queue, where it would sit for good. That turn carries it once every window the
+stop holds has reset (review4 V1, the owner's answer of 2026-11-23), and the message never expires while it waits.
 
 Every outcome is one closed word, journalled (registry codes); never a conversation's words.
 """
@@ -269,13 +268,14 @@ class UsageStop(UsagePause):
             if found is None:
                 continue                                                # not known now: nothing sent, asked next look
             unsure = row["record_id"] in self._unsure
-            if held and found[0] != CARRY and not unsure:
-                continue                                                # its own continuation held with the window
-            # v0.6.26 (audit4 B1): a person's reset message is never held by the pause (`holds`: never a person's
-            # message), and reset_message leaves one due here to this turn (resetmessage.carried_by_stop). Held with
-            # the other window, it expired unsent a day after it fell due and the continuation went in its place at the
-            # weekly reset. So once this continuation's own window has reset, its turn carries the message whatever
-            # another window holds; the continuation itself still waits for every window.
+            if held and not unsure:
+                # v0.6.26 (review4 V1, the owner's answer of 2026-11-23): no turn starts while any window the stop holds
+                # has not reset - neither its continuation nor the person's message it carries. The message waits for
+                # every held window, reset_message holding it meanwhile (resetmessage.carried_by_stop) and never letting
+                # it expire for that wait (`_held_by_stop`, audit4 B1/B3); then this turn carries it, once, and nothing
+                # follows it. (audit4 B1's first fix carried it at its own window's reset, into a weekly window over its
+                # stop percentage.)
+                continue
             if found[0] == INSTEAD and not unsure:
                 handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)          # the person's message went (R2)
                 self._count(MESSAGE_INSTEAD)
