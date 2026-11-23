@@ -243,23 +243,30 @@ class UsageStop(UsagePause):
         scoped = self._scoped
         try:
             going = self._continue_on()
+            key = answer_key(ContinuationKind.AFTER_RESET, thread, window["bucket"], window["minutes"],
+                             window["reset_at"])
+            if scoped.continuations.get(key) is not None:
+                return going
+            if not going:
+                # review6 A1: kept with no words, so no version - this one, or an older one a person goes back to -
+                # ever starts the product's continuation from it; the message's own words come from its rule.
+                scoped.continuations.hold(key, ContinuationKind.AFTER_RESET, thread, ordinal=turn.ordinal,
+                                          chain=window["minutes"])
+                return False
             words = statement.CATALOGS.text(AFTER_RESET_KEY, self._locale())
             if not words_pass(words):
                 return False
-            key = answer_key(ContinuationKind.AFTER_RESET, thread, window["bucket"], window["minutes"],
-                             window["reset_at"])
-            if scoped.continuations.get(key) is None:
-                scoped.continuations.add(key, ContinuationKind.AFTER_RESET, thread, words, ordinal=turn.ordinal,
-                                         chain=window["minutes"])
-            return going
+            scoped.continuations.add(key, ContinuationKind.AFTER_RESET, thread, words, ordinal=turn.ordinal,
+                                     chain=window["minutes"])
+            return True
         except Exception:
             return False
 
     def _waiting(self) -> list:
-        """The continuations after a reset that wait."""
+        """The continuations after a reset that wait - with words, or (review6 A1) held with none, for a message only."""
         try:
             return [row for row in self._scoped.continuations.mine() if row["record_state"] == RecordState.WAITING
-                    and row["kind"] == ContinuationKind.AFTER_RESET and row["words"]]
+                    and row["kind"] == ContinuationKind.AFTER_RESET]
         except Exception:
             return []
 
@@ -346,7 +353,7 @@ class UsageStop(UsagePause):
                 continue
             if latest.status not in FINAL or found[0] == QUEUED:
                 continue
-            if found[0] == CONTINUE and not going:
+            if found[0] == CONTINUE and not (going and row["words"]):
                 # review4 V4: Continue after the reset off - nothing of the product's own goes. This waits with the
                 # paused queue, so a reset message of the conversation falling due later is still carried by this turn
                 # at its due time, and lets that queue go; newer work (the person's Resume) ends it.

@@ -70,6 +70,30 @@ class ContinuationsMixin:
                                (key, capability, kind, thread_id, key, ordinal, words, chain, now))
             return True
 
+    def add_held_continuation(self, key, capability, kind, thread_id, *, ordinal, chain=1, at=None) -> bool:
+        """review6 A1: a continuation kept waiting with NO words of its own - its record waiting, in the same
+        transaction - or False where the key is taken. usage_pause's stop with Continue after the reset off keeps one,
+        so the stop's turn after the reset can still carry a person's reset message (review4 V4) while no version, this
+        one or an older one, ever starts the product's own words from it: every usage_pause from v0.6.16-beta.4 starts
+        only a waiting row that has words."""
+        _key(key, "continuation key")
+        _capability(capability)
+        kind = _word(kind, ContinuationKind, "kind")
+        _thread(thread_id)
+        if type(ordinal) is not int or ordinal < 0 or type(chain) is not int or chain < 1:
+            raise StateError("invalid continuation")
+        now = self._now(at)
+        with self._transaction() as connection:
+            if connection.execute("SELECT 1 FROM continuations WHERE answer_id=? UNION SELECT 1 FROM records "
+                                  "WHERE record_id=?", (key, key)).fetchone():
+                return False
+            connection.execute("INSERT INTO records (record_id, capability, thread_id, state, created_at, claims) "
+                               "VALUES (?,?,?,?,?,0)", (key, capability, thread_id, RecordState.WAITING, now))
+            connection.execute("INSERT INTO continuations (answer_id, capability, kind, thread_id, record_id, ordinal, "
+                               "words, chain, created_at) VALUES (?,?,?,?,?,?,NULL,?,?)",
+                               (key, capability, kind, thread_id, key, ordinal, chain, now))
+            return True
+
     def note_continuation(self, key, capability, kind, thread_id, reason, *, ordinal=None, chain=0, at=None) -> bool:
         """A turn the edition decided not to answer, kept so it is decided once: no record, no words, finished with
         `reason` (a goal left alone, a chain spent, a stop told in the parent's own continuation). False if
@@ -317,6 +341,10 @@ class ContinuationsHandle:
             "add": writing(lambda key, kind, thread_id, words, *, ordinal, chain=1:
                            state.add_continuation(key, capability, kind, thread_id, words, ordinal=ordinal,
                                                   chain=chain)),
+            # review6 A1: one kept waiting with no words of its own (usage_pause's stop with Continue after the reset off).
+            "hold": writing(lambda key, kind, thread_id, *, ordinal, chain=1:
+                            state.add_held_continuation(key, capability, kind, thread_id, ordinal=ordinal,
+                                                        chain=chain)),
             "note": writing(lambda key, kind, thread_id, reason, *, ordinal=None, chain=0:
                             state.note_continuation(key, capability, kind, thread_id, reason, ordinal=ordinal,
                                                     chain=chain)),
