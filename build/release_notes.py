@@ -223,11 +223,47 @@ def hidden_words() -> tuple:
     return tuple(sorted(words, key=lambda word: (-len(word), word)))
 
 
+# What the words alone miss (v0.6.26 review R2): a plain description of a press, or a day's name inflected or spelled
+# apart. From the egg code (gui/SoftEggs.cs: its header calls them "the version's easter eggs", PressRun plays the special
+# one at the sixth press - Wanted = 6 - and ConfettiBurst throws the confetti) and the day tables (DAY_LOOKS' names and
+# the Korean names the ko catalog's status.aside_day_* sentences give them). Each pattern is matched whole, in any case.
+# Allowed on purpose, since real entries need them: "six" and "sixth" alone (page counts, "six hours"), "hidden",
+# "surprise", "press" and "pressed" alone, and the Korean "여섯 번" alone (counts in three entries); only a press
+# counted to six is refused.
+PRESS_PATTERNS = (
+    r"easter[\s-]*eggs?", r"eggs?", r"confetti",
+    r"six\s+(?:times|presses|clicks|taps)", r"sixth\s+(?:press|click|tap)",
+    r"press(?:es|ed|ing)?\s+(?:\w+\s+){0,3}six", r"press(?:es|ed|ing)?\s+(?:on\s+)?the\s+version",
+    # Korean takes its particles and endings on the word itself (추석에, 이스터에그를, 누르면): what follows is let be.
+    r"이스터\s*에그\w*", r"콘페티\w*",
+    r"여섯\s*번(?:째)?\s*(?:누르|눌러|누름|클릭)\w*",
+)
+# The Korean names of the days, as the ko catalog's status.aside_day_* sentences name them: 생일, 새해, 크리스마스,
+# 설날, 추석 - with whatever particle follows (설날에), but never inside another word (발생일).
+KOREAN_DAYS = ("생일", "새해", "크리스마스", "설날", "추석")
+
+
+def day_pattern(day: str) -> str:
+    """A day's name with its letters spelled apart or not (`Seol-lal`, `newyear`) and its plural or possessive."""
+    parts = [r"[\s-]?".join(re.escape(letter) for letter in part) for part in day.split("_")]
+    return r"[\s_-]*".join(parts) + "(?:e?s|['’]s)?"
+
+
+def hidden_patterns() -> tuple:
+    """(what it names, the pattern) for every day's name, every press described and every word of hidden_words."""
+    found = [(day, day_pattern(day)) for day in day_looks()]
+    found += [(pattern, pattern) for pattern in PRESS_PATTERNS]
+    found += [(name, re.escape(name) + r"\w*") for name in KOREAN_DAYS]
+    found += [(word, re.escape(word)) for word in hidden_words()]
+    return tuple(found)
+
+
 def hidden_named(body: str):
-    """The first special day or hidden press `body` names, whole and in any case, or None."""
-    for word in hidden_words():
-        if re.search(r"(?<!\w)%s(?!\w)" % re.escape(word), body, re.IGNORECASE):
-            return word
+    """The first special day or hidden press `body` names, whole and in any case, or None: the text it found."""
+    for _name, pattern in hidden_patterns():
+        match = re.search(r"(?<!\w)(?:%s)(?!\w)" % pattern, body, re.IGNORECASE)
+        if match:
+            return match.group(0)
     return None
 
 

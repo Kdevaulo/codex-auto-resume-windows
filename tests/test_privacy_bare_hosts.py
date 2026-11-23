@@ -19,12 +19,18 @@ covers a document's pictures is the owner's word (audit4 E7).
 How a host is known (D4): case-insensitively - `Telemetry.Example.COM` is a host - and by any ending in TLDS, every
 country code and the generic endings, not nine. Code reads like a host there (`rect.top`, `self.app`, `System.IO`), so a
 name is not taken for one when:
-  - its ending is a file's extension the trees use (`watcher.py`, `Setup.cs`, `README.md`);
+  - its ending is a file's extension the trees use and it is a file's name: two labels (`watcher.py`, `Setup.cs`), a
+    Korean twin (`GUIDE.ko.md`) or a version in it (`python-3.13.18-embed-amd64.zip`) - so `telemetry.example.in`,
+    `beacon.collect.sh` are hosts (review R6);
   - it is a key, or the start of a key, of either edition's English catalog (`page.chat.click`);
-  - it ends outside the nine endings C3's first scan knew and its first label is a receiver in that same file: the
-    start of another name there whose last label is no ending at all (`rect.left` makes `rect.top` code);
+  - it ends outside the nine endings C3's first scan knew and, of two labels, its first is a receiver in that same file:
+    the start of another name there whose last label is no ending at all (`rect.left` makes `rect.top` code); of three
+    or more, its first two lead another chain there (`self.paths.data` makes `self.paths.home` code, while
+    `report.Send` does not make `report.example.dev` code - review R6);
   - or it is one of CODE_NAMES, each read in its file and found to be code: a new one fails the test until it is checked
     the same way.
+A bare IPv4 address is a host too (review R6), but for the loopback and the listen-everywhere 0.0.0.0, and the dotted
+numbers that are no address, each named with its file (NOT_ADDRESSES).
 """
 from __future__ import annotations
 
@@ -77,14 +83,27 @@ EXTENSIONS = frozenset(("py", "cs", "md", "sh", "js", "ps", "zip", "exe", "json"
 BARE_HOST = re.compile(r"(?<![\w.@-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,63}))(?![\w(-])", re.I)
 CHAIN = re.compile(r"(?<![\w.])[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+")
 # Names the scan reads as hosts that are code, each read in its file (2026-11-23): a member of an object, a module or a
-# type (`os.name`, `Keys.Space`, `DockStyle.Top`, `System.IO`), or an M-record's name (`measurement.MK`).
+# type (`os.name`, `Keys.Space`, `DockStyle.Top`, `System.IO`), or an M-record's name (`measurement.MK`); since review R6
+# also the chains of three labels whose start leads no other chain in their file (`self.logger.info`, `card.Margin.Top`,
+# the property key `System.AppUserModel.ID`).
 CODE_NAMES = frozenset("""
 args.home arguments.home authfile.name autoresult.fail brand.design build.page chevron.to chooser.id copied.id
 credit.family dayart.fit definition.id dockstyle.top e.data each.id ended.code entry.name error.code exc.code gone.code
 helpnode.id keys.space made.host made.name marketplace.name mcpserverstatus.tools measurement.mk measurement.mq
 measurement.mr measurement.ms measurement.mu os.name outcomechart.bar ownprocess.id p.parts path.name paths.home
 pwsh.run refused.code reporter.windows righttoleft.no search.click self.code self.home self.id semibold.name
-softmenurenderer.fit started.id style.name system.io threads.name""".split())
+softmenurenderer.fit started.id style.name system.io threads.name
+app.logger.info self.logger.info card.margin.top whole.fontfamily.name face.fontfamily.name
+control.accessibilityobject.name entry.psobject.properties system.appusermodel.id""".split())
+# A bare IPv4 address (review R6), and the ones that are no host to reach: this PC's loopback and the address a server
+# binds to listen on every interface (the advanced loopback web view), and dotted numbers of the same shape that are not
+# addresses at all - an assembly's version in the manifests and SoftCombo.cs, X.509's commonName OID in authenticode.py.
+IPV4 = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
+NO_HOST_ADDRESSES = frozenset(("127.0.0.1", "0.0.0.0"))
+NOT_ADDRESSES = {"1.0.0.0": ("build/setup/setup.manifest", "gui/app.manifest"), "4.0.0.0": ("gui/SoftCombo.cs",),
+                 "2.5.4.3": ("src/codex_auto_resume/win/authenticode.py",),
+                 # the advanced page's example of the web view's address from another device (as in test_privacy_claims)
+                 "192.168.0.2": ("advanced/gui/AdvancedExamples.cs",)}
 ALLOWED = re.compile(r"^(?:(?:api|raw|objects|release-assets)\.)?github(?:usercontent)?\.com$|^(?:www\.)?python\.org$"
                      r"|^chatgpt\.com$|^chcp\.com$|^agent-plugins\.org$|^(?:schemas|docs|learn)\.microsoft\.com$")
 COURIER_ONLY = re.compile(r"^(?:api\.telegram\.org|status\.openai\.com)$")
@@ -132,16 +151,33 @@ def hosts_in(text: str, keys=frozenset()) -> list:
         last = chain.rsplit(".", 1)[1]
         if last.lower() not in TLDS or not last.isalpha():
             receivers.setdefault(chain.split(".", 1)[0].lower(), set()).add(chain.lower())
+    # The chains' two-label starts (`self.paths` of `self.paths.home`), each with the chains it starts: a name of three
+    # labels or more is code only where its own start leads another chain in the file (review R6).
+    starts = {}
+    for chain in CHAIN.findall(text):
+        labels = chain.lower().split(".")
+        if len(labels) > 2:
+            starts.setdefault(".".join(labels[:2]), set()).add(chain.lower())
+        elif len(labels) == 2:
+            starts.setdefault(chain.lower(), set()).add(chain.lower() + ".")
     found = set()
     for match in BARE_HOST.finditer(text):
         name, ending = match.group(1).lower(), match.group(2).lower()
-        if ending not in TLDS or ending in EXTENSIONS:
+        labels = name.split(".")
+        if ending not in TLDS:
             continue
+        if ending in EXTENSIONS and (len(labels) < 3 or labels[-2] == "ko" or any(label.isdigit() for label in labels)):
+            continue                                   # a file's name: `watcher.py`, `GUIDE.ko.md`, `python-3.13.18-...`
         if name in keys or any(key.startswith(name + ".") for key in keys):
             continue
-        if ending not in FIRST_NINE and receivers.get(name.split(".")[0], set()) - {name}:
-            continue
+        if ending not in FIRST_NINE:
+            if len(labels) == 2 and receivers.get(labels[0], set()) - {name}:
+                continue
+            if len(labels) > 2 and starts.get(".".join(labels[:2]), set()) - {name}:
+                continue
         found.add(name)
+    for match in IPV4.finditer(text):
+        found.add(match.group(0))
     return sorted(found)
 
 
@@ -157,6 +193,8 @@ def bare_hosts():
         for host in hosts_in(text, keys):
             if host in CODE_NAMES or ALLOWED.match(host) or (name.startswith(ADVANCED) and COURIER_ONLY.match(host)):
                 continue
+            if host in NO_HOST_ADDRESSES or name in NOT_ADDRESSES.get(host, ()):
+                continue
             found.append("%s: %s" % (name, host))
     return sorted(found)
 
@@ -168,7 +206,7 @@ class BareHostTests(unittest.TestCase):
 
     def test_the_lookup_sees_what_it_is_for(self):
         for sample, expected in (("the Institute, astro.kasi.re.kr) computes", ["astro.kasi.re.kr"]),
-                                 ("(figma.com/blog)", ["figma.com"]), ("args.left args.dev self.x self.app.logger.info", []),
+                                 ("(figma.com/blog)", ["figma.com"]), ("args.left args.dev self.app.x self.app.logger.info", []),
                                  # D4: what the nine lowercase endings missed.
                                  ('Url = "https://telemetry.example.dev/x";', ["telemetry.example.dev"]),
                                  ('Url = "https://Telemetry.Example.COM/x";', ["telemetry.example.com"]),
@@ -180,6 +218,15 @@ class BareHostTests(unittest.TestCase):
         self.assertEqual(hosts_in("rect.left; evil.example.com"), ["evil.example.com"])
         self.assertEqual(hosts_in("example.left; example.com"), ["example.com"], "never let off under the first nine")
         self.assertEqual(hosts_in("page.chat.click", frozenset({"page.chat.click.page"})), [], "a catalog key's start")
+        # Review R6: the endings shared with file extensions, a host whose first label is a receiver, a bare address.
+        for sample, expected in (('host = "telemetry.example.in"', ["telemetry.example.in"]),
+                                 ("stats.tracker.pl beacon.collect.sh metrics.example.cc",
+                                  ["beacon.collect.sh", "metrics.example.cc", "stats.tracker.pl"]),
+                                 ('report.Send(x); var h = "report.example.dev";', ["report.example.dev"]),
+                                 ('new TcpClient("203.0.113.5", 443)', ["203.0.113.5"]),
+                                 ("watcher.py GUIDE.ko.md python-3.13.18-embed-amd64.zip", []),
+                                 ("self.paths.home and self.paths.data", []), ("version 1.2.3", [])):
+            self.assertEqual([host for host in hosts_in(sample) if host not in CODE_NAMES], expected, sample)
         self.assertIsNone(ALLOWED.match("figma.com"))
         self.assertIsNone(ALLOWED.match("github.com.example.org"))
         self.assertIsNotNone(ALLOWED.match("raw.githubusercontent.com"))
