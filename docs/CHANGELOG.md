@@ -15,8 +15,8 @@ changed, the lists and bounds of *Install another version...*, the window's wait
 edition, a paused queue that is let go at the reset. Both editions change in the first group; the second is the advanced edition's alone.
 
 **Going back.** Nothing that an earlier version reads changes: the watcher's state, the settings file and the advanced edition's own file
-keep the versions they had. The watcher now also keeps one small file of its own beside them, `codex-layout.json` in its state folder -
-the last Codex layout it looked at - which an earlier version ignores.
+keep the versions they had. The watcher now also keeps two small files of its own beside them in its state folder, `codex-layout.json` -
+the last Codex layout it looked at - and `selfcheck.json` - its judgement of its own looks - which an earlier version ignores.
 
 ### Both editions
 
