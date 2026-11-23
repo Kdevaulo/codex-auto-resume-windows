@@ -149,6 +149,52 @@ class _Handler(urllib.request.HTTPSHandler):
         return self.do_open(self._connection, req, context=self._context)
 
 
+class _Held:
+    """A connection whose socket a `_Whole` (`whole`, set on a class made for one call) holds from the moment it exists -
+    over HTTPS before the TLS handshake - so the caller's deadline covers the handshake, the status line and the headers
+    as it covers the body (audit4 D3: armed only once the reply was back, a service that trickled its headers ran a 2 s
+    deadline for 12 s)."""
+    whole = None
+
+    def connect(self):
+        if not isinstance(self, http.client.HTTPSConnection):
+            super().connect()
+            self.whole.hold(self.sock)
+            return
+        http.client.HTTPConnection.connect(self)
+        self.whole.hold(self.sock)
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=self._tunnel_host or self.host,
+                                              do_handshake_on_connect=False)
+        self.whole.hold(self.sock)
+        self.sock.do_handshake()
+
+
+class _HeldHTTPS(urllib.request.HTTPSHandler):
+    def __init__(self, whole, **keywords):
+        super().__init__(**keywords)
+        self._connection = type("_HeldHTTPSConnection", (_Held, http.client.HTTPSConnection), {"whole": whole})
+
+    def https_open(self, req):
+        return self.do_open(self._connection, req, context=self._context)
+
+
+class _HeldHTTP(urllib.request.HTTPHandler):
+    """Plain HTTP, held the same way: never reached by the courier (checked_url refuses http) but by a loopback test."""
+
+    def __init__(self, whole, **keywords):
+        super().__init__(**keywords)
+        self._connection = type("_HeldHTTPConnection", (_Held, http.client.HTTPConnection), {"whole": whole})
+
+    def http_open(self, req):
+        return self.do_open(self._connection, req)
+
+
+def _held_opener(whole):
+    """`stream`'s opener where the caller gives a deadline: verification on, redirects refused, every connection held by
+    `whole` from its making."""
+    return urllib.request.build_opener(_HeldHTTPS(whole, context=context()), _HeldHTTP(whole), _NoRedirect())
+
+
 def make_opener(*, whole=True):
     """urllib's opener for every courier request: verification on, redirects refused - and, but for `stream`, the
     request's time in all bounded (WHOLE_MORE)."""
@@ -251,12 +297,21 @@ def stream(url, take, *, timeout=TIMEOUT, opener=None, piece=STREAM_PIECE, ends=
     v0.6.26 (audit A7 / security S3): each piece is what one read of the socket brought (`read1`), not a whole
     STREAM_PIECE - a buffered read waits for all of it, so a service that sent a byte inside each read's timeout held one
     piece for days and `take` never saw its deadline. And where `ends` is given - the caller's deadline on the monotonic
-    clock - the reply's socket is shut when it comes (`_Whole`), so no read waits past it: Failed("timeout")."""
-    reply = _opened(url, None, None, "GET", timeout, opener, whole=False)
-    whole = None
+    clock - the reply's socket is shut when it comes (`_Whole`), so no read waits past it: Failed("timeout"). That clock
+    starts with the call (audit4 D3): the connection, the TLS handshake, the status line and the headers are inside it.
+    """
+    whole = _Whole(max(0.0, ends - time.monotonic())) if ends is not None else None
     try:
-        if ends is not None:
-            whole = _Whole(max(0.0, ends - time.monotonic()))
+        reply = _opened(url, None, None, "GET", timeout,
+                        opener if opener is not None or whole is None else _held_opener(whole), whole=False)
+    except BaseException as exc:
+        if whole is not None:
+            whole.cancel()
+            if whole.expired and isinstance(exc, Failed):
+                raise Failed("timeout") from None          # cut at the deadline, whatever the cut looked like
+        raise
+    try:
+        if whole is not None:
             sock = _socket_of(reply)
             if sock is not None:
                 whole.hold(sock)

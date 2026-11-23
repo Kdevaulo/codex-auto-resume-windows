@@ -37,10 +37,16 @@ CHECK = 10                       # seconds between two reads of the states
 # v0.6.26 (the owner's logs, O2): a read of the states that fails - the state busy, a read that took 90-105 s on 2026-11-19
 # - is no reading that says off. What runs keeps running, and the read is tried again every CHECK seconds, for up to this
 # long in a row; only then is nothing served and the process ended, as before. On 2026-11-19 one failed read each time
-# ended the resident, and four ends in an hour left the local API down for the hour (engine/remote.py RESTARTS).
+# ended the resident, and four ends in an hour left the local API down for the hour (engine/remote.py RESTARTS). Counted by
+# the monotonic clock from the first failed read (audit4 J1/L1): a failed read is not instant - the state's open waits up
+# to 10 s, and the 2026-11-19 reads took 90-105 s - so sixty reads counted as CHECK each lasted up to 100 minutes.
 UNREADABLE_FOR = 600
 UNREADABLE = "unreadable"        # its journal code, once for each run of failed reads, beside each role that runs
 SYNCHRONIZE = 0x00100000
+
+
+class Unreadable(Exception):
+    """The states read as failed (runtime._unreadable): what runs is kept, and the read tried again."""
 
 
 def mutex(paths, timeout=0):
@@ -71,17 +77,22 @@ class Roles:
 
     def __init__(self, runtime, *, server=None, poller=None):
         self.runtime = runtime
+        self._clock = time.monotonic                    # a run of failed reads is timed by it (a test sets its own)
         self._server_factory = server or _server
         self._poller = poller or _poll
         self.thread, self.stop = None, None
         self.server, self.serving = None, None          # the server, and the (port, lan) it serves on
         self._taken = None                              # the (port, lan) last found taken, journalled once
-        self._unread = 0                                # reads of the states failed in a row
+        self._unread_since = None                       # the monotonic time the first of a run of failed reads ended
         self._mark(None)                                # a resident before this one said nothing about this one
 
     def wanted(self) -> tuple:
         """(port or None, lan, telegram): what the states ask for now."""
         states = self.runtime.states(fresh=True)
+        if getattr(self.runtime, "_unreadable", False):
+            # audit4 J1/L1: a state busy or locked does not raise out of `states` - arming.read turns its StateError into
+            # every capability OFF, marked failed (runtime._unreadable). That is no reading that says off.
+            raise Unreadable("the advanced state could not be read")
         api = states.get(API) == ArmingState.ARMED
         port = None
         if api:
@@ -94,12 +105,13 @@ class Roles:
         """The roles brought to what the states ask for; whether any is wanted."""
         try:
             port, lan, telegram = self.wanted()
-            self._unread = 0
+            self._unread_since = None
         except Exception:
-            self._unread += 1
-            if self._unread == 1:
+            now = self._clock()
+            if self._unread_since is None:
+                self._unread_since = now
                 self._count_unreadable()
-            if self._unread * CHECK < UNREADABLE_FOR:
+            if now - self._unread_since < UNREADABLE_FOR:
                 return True                                   # nothing read says off: kept as it is, read again
             port, lan, telegram = None, False, False          # unreadable this long: nothing is served
         if self.server is not None and self.serving != (port, lan):

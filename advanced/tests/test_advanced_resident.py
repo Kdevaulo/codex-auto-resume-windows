@@ -236,13 +236,17 @@ class RolesTests(ResidentCase):
 
     def test_what_cannot_be_read_for_ten_minutes_serves_nothing(self):
         """v0.6.26 (O2): one failed read keeps what runs (test_advanced_resident_unreadable); a run of them as long as
-        UNREADABLE_FOR serves nothing, as one did before."""
+        UNREADABLE_FOR serves nothing, as one did before - by the clock from the first of them (audit4 J1/L1), each check
+        CHECK seconds after the last."""
         self.assertTrue(self.arm(self.rt, "local_api")["done"])
         roles = resident.Roles(self.rt, server=self.server)
+        clock = [0.0]
+        roles._clock = lambda: clock[0]
         roles.follow()
         with patch.object(self.rt, "states", side_effect=RuntimeError("no")):
-            for _check in range(resident.UNREADABLE_FOR // resident.CHECK - 1):
+            for _check in range(resident.UNREADABLE_FOR // resident.CHECK):
                 self.assertTrue(roles.follow())
+                clock[0] += resident.CHECK
             self.assertFalse(roles.follow())
         self.assertEqual(self.servers[0].closed, 1)
 

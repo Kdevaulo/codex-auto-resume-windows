@@ -128,7 +128,8 @@ MAIL_SECONDS = 4 * http.TIMEOUT
 
 class _Clocked:
     """smtplib's SMTP and SMTP_SSL, each connection's socket held by `whole`, which closes it when the time is up - so a
-    read waiting on it returns at once and the send ends as "timeout"."""
+    read waiting on it returns at once and the send ends as "timeout". STARTTLS wraps the socket in a new one and detaches
+    the first (audit4 J2): the wrapped one is held from then on, or the time in all bound nothing after STARTTLS."""
 
     def __init__(self, whole):
         def held(base):
@@ -137,6 +138,13 @@ class _Clocked:
                     sock = super()._get_socket(host, port, timeout)
                     whole.hold(sock)
                     return sock
+
+                def starttls(self, *arguments, **keywords):
+                    try:
+                        return super().starttls(*arguments, **keywords)
+                    finally:
+                        if self.sock is not None:
+                            whole.hold(self.sock)
             return Held
         self.SMTP, self.SMTP_SSL = held(smtplib.SMTP), held(smtplib.SMTP_SSL)
 
@@ -176,12 +184,12 @@ def mail(settings, event, text, *, smtp=None) -> str:
     except (smtplib.SMTPException, socket.timeout, TimeoutError, OSError):
         raise http.Failed("timeout") from None
     finally:
-        whole.cancel()
         if server is not None:
             try:
-                server.quit()
+                server.quit()                     # inside the time in all too (audit4 J2): a QUIT reply is read as any
             except Exception:
                 pass
+        whole.cancel()
     return "2xx"
 
 
