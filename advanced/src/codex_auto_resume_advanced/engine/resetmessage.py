@@ -311,20 +311,30 @@ class ResetMessage:
         """audit4 B3: whether a message that would expire is held by the forced stop instead - carried by its turn after
         the reset (`_stop_carries`), or let go by that stop less than DUE_FOR ago (its continuation finished after the
         message fell due: carried by another message, ended by newer work, or the capability turned off). A message
-        held for days waiting for the stop's window is never deleted for that wait. Asked only of one about to expire."""
-        if rule["state"] != RuleState.READY or rule["record_state"] != RecordState.WAITING or not rule["words"]:
+        held for days waiting for the stop's window is never deleted for that wait. matrix5 M3: one still counting
+        toward its reset is held as well while the stop's turn waits in its conversation - the eight days from its
+        writing expired it there, and the stop's turn never got to carry it. Asked only of one about to expire."""
+        if (rule["state"] not in (RuleState.READY, RuleState.COUNTING) or rule["record_state"] != RecordState.WAITING
+                or not rule["words"]):
             return False
         if self._stop_carries(rule):
             return True
         due = rule.get("due_at")
+        due = due if isinstance(due, (int, float)) and not isinstance(due, bool) else None
         try:
-            stops = self._scoped.continuations_of(PAUSE, rule["thread_id"], pending=None)
+            armed = self._scoped.armed(PAUSE) is True
+            stops = [stop for stop in self._scoped.continuations_of(PAUSE, rule["thread_id"], pending=None)
+                     if stop.get("kind") == ContinuationKind.AFTER_RESET
+                     and isinstance(stop.get("created_at"), (int, float))]
         except Exception:
             return False
-        return isinstance(due, (int, float)) and any(
-            stop.get("kind") == ContinuationKind.AFTER_RESET and isinstance(stop.get("created_at"), (int, float))
-            and isinstance(stop.get("finished_at"), (int, float)) and stop["created_at"] <= due <= stop["finished_at"]
-            and now - stop["finished_at"] < DUE_FOR for stop in stops)
+        if armed and any(stop.get("finished_at") is None and stop.get("record_state") == RecordState.WAITING
+                         and stop.get("words") for stop in stops):
+            return True
+        since = due if due is not None else rule["created_at"]
+        return any(isinstance(stop.get("finished_at"), (int, float)) and stop["finished_at"] >= since
+                   and (due is None or stop["created_at"] <= due) and now - stop["finished_at"] < DUE_FOR
+                   for stop in stops)
 
     def _count(self, code) -> None:
         try:

@@ -163,6 +163,20 @@ class ContinuationsMixin:
                 return None
             return {"capability": row["capability"], "trip": move == "unproven"}
 
+    def doubt_continuation(self, answer_id, capability, at=None) -> bool:
+        """review4 V3: a waiting continuation of `capability` whose turn carried a message the app may not have received
+        (usage_pause's unconfirmed carry, audit4 B4) - marked in `launching_at`, which no such continuation otherwise
+        uses (they are never handed to core), so a restart still waits out the backoff and asks for Resume rather than
+        take the carry as sent. Whether it was marked."""
+        _key(answer_id, "answer id")
+        now = self._now(at)
+        with self._transaction(create=False) as connection:
+            if connection is None:
+                return False
+            return connection.execute(
+                "UPDATE continuations SET launching_at=coalesce(launching_at, ?) WHERE answer_id=? AND capability=? "
+                "AND finished_at IS NULL", (now, answer_id, _capability(capability))).rowcount == 1
+
     def end_continuations(self, reason, *, capability=None, thread_id=None, at=None) -> int:
         """Every continuation still waiting to be sent - of `capability`, of `thread_id`, or all - ended with
         `reason` (turned off, the conversation switched off), its words gone and its record cancelled. One in
@@ -308,6 +322,8 @@ class ContinuationsHandle:
                                                     chain=chain)),
             "end": writing(lambda reason, *, thread_id=None: state.end_continuations(reason, capability=capability,
                                                                                      thread_id=thread_id)),
+            # review4 V3: usage_pause's carried start in doubt, kept across a restart.
+            "doubt": writing(lambda answer_id: state.doubt_continuation(answer_id, capability)),
             # keep_going's own (engine/keepgoing.py).
             "kept": state.keep_going,
             "kept_used": writing(state.keep_going_used),

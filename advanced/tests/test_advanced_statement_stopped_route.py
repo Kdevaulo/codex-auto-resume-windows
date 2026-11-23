@@ -8,6 +8,10 @@ message of either window): that turn passes core's errand guard alone, not those
 pace, and the message waits for the stop's window even when written for the other one. Now the statement says so, in a
 sentence of its own that names Stop near a limit in each catalog's own words.
 
+review4 V1-V5 corrected it (the owner's answers of 2026-11-23): the message waits until every limit the stop holds has
+reset; it goes even with Continue after the reset off; the turn still needs the app to hold the conversation; and Resume
+before then returns it to the usual route.
+
     CODEX_AR_EDITION=advanced PYTHONPATH="src;advanced/src;tests" python -m unittest test_advanced_statement_stopped_route
 """
 from __future__ import annotations
@@ -35,12 +39,25 @@ class StoppedRouteTests(unittest.TestCase):
                 table = catalog(path)
                 self.assertIn(table["name.usage_pause"], table["statement.reset_message.does"])
 
+    def test_every_catalog_names_continue_after_the_reset(self):
+        """review4 V4/V5: the carry goes even with Continue after the reset off - every catalog names that choice there.
+        Fails with B5's first sentence, which did not."""
+        for path in CATALOGS:
+            with self.subTest(path.name):
+                table = catalog(path)
+                self.assertIn(table["page.option.wrap_after_reset"], table["statement.reset_message.does"])
+
     def test_the_english_words(self):
+        """review4 V1-V5: every held limit first, Continue after the reset off too, the app must still hold the
+        conversation, and Resume returns it to the usual route."""
         does = catalog(statement.DIRECTORY / "en.json")["statement.reset_message.does"]
         self.assertTrue(does.endswith(
-            " In a conversation Stop near a limit has stopped, the stop's own turn after its reset carries the message "
-            "instead: that turn does not go through those checks or count toward the twenty a day, and the message "
-            "waits for that reset even when it was written for the other limit."))
+            " In a conversation Stop near a limit has stopped, the message waits until every limit the stop holds has "
+            "reset, even one written for the other limit, and the stop's own turn then carries it, even with Continue "
+            "after the reset off: that turn still needs the conversation open in the app, but not the other two checks, "
+            "and it does not count toward the twenty a day. If you press Resume in Codex before then, the message goes "
+            "the usual way at its own reset."))
+        self.assertNotIn("does not go through those checks", does)
 
 
 if __name__ == "__main__":

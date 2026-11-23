@@ -300,7 +300,10 @@ class NoContinuationTests(StopCase):
         self.assertEqual(len(self.stops), 1)
         self.assertIn("pause.resume_unproven", self.journal(plug))
         self.assertEqual(self.kinds(plug), ["press_resume"])
-        self.assertEqual(plug.runtime.state.continuations(capability=self.cap, pending=None), [])
+        # review4 V4 (the owner's answer of 2026-11-23): the stop's turn is kept even so, for a reset message it would
+        # carry; without one nothing goes (test_advanced_usagestop_continue_off).
+        (kept,) = plug.runtime.state.continuations(capability=self.cap, pending=None)
+        self.assertEqual(kept["kind"], "after_reset")
 
     def test_a_stop_with_no_answer_asks_for_resume_too_where_nothing_will_continue_it(self):
         self.stop_answer = ipc.Stop.UNCONFIRMED
