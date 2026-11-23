@@ -19,10 +19,11 @@ def parse_usage(value):
     if not isinstance(buckets, dict) or not buckets:
         legacy = value.get("rateLimits")
         buckets = {"legacy": legacy} if isinstance(legacy, dict) else {}
-    windows, blocked, spending, explicit_limit = [], [], False, False
+    windows, blocked, spending, explicit_limit, named = [], [], False, False, bool(buckets)
     for bucket_id, bucket in buckets.items():
         if not isinstance(bucket, dict):
             return unknown
+        named &= "primary" in bucket and "secondary" in bucket
         safe_id = bucket_id if bucket_id in ("codex", "premium", "legacy") else "other"
         spending |= bucket.get("spendControlReached") is True
         explicit_limit |= bucket.get("rateLimitReachedType") == "rate_limit_reached"
@@ -66,4 +67,10 @@ def parse_usage(value):
     if windows:
         return {"available": True, "reset_at": None, "limit_type": "exposed_windows",
                 "reason": "exposed_windows_available_specific_model_bucket_not_guaranteed", "windows": windows}
+    if named:
+        # Fourth round A2: every bucket names both windows and exposes neither (null) - the form of the measured answer's
+        # `premium` bucket (codex/payload.py), for every bucket. A known answer that tells nothing, as a refusal does:
+        # the record waits usage_unknown, and the method is not "Codex changed".
+        return {"available": None, "reset_at": None, "limit_type": "unknown", "reason": "usage_no_exposed_windows",
+                "windows": []}
     return unknown

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 import re
 import time
 
@@ -40,8 +40,7 @@ _WORD = re.compile(r"[\x20-\x7e]{1,64}\Z")
 
 
 def _engine(row) -> bool:
-    return (isinstance(row, dict) and isinstance(row.get("path"), str)
-            and PureWindowsPath(row["path"]).name.lower() == "codex.exe")
+    return pairing.engine_row(row)
 
 
 def snapshot(rows, codex_exe=None, seen=None) -> dict:
@@ -55,8 +54,11 @@ def snapshot(rows, codex_exe=None, seen=None) -> dict:
         rows = [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
         mains = pairing.app_mains(rows)
         found["mains"] = len(mains)
-        found["helpers"] = sum(1 for row in rows if pairing.app_process(row)) - len(mains)
         main = mains[0] if len(mains) == 1 else None
+        # Fourth round A1: a package program of a folder below `app` counts as a helper only under the main.
+        found["helpers"] = sum(1 for row in rows if pairing.app_process(row) and not any(row is each for each in mains)
+                               and (pairing._main_place(row["path"])
+                                    or (main is not None and pairing.under_app(rows, row, main["pid"]))))
         if main is not None:
             found["renamed_main"] = not pairing._package_app(main["path"])
             version = _VERSION.search(main["path"])
@@ -90,12 +92,55 @@ def read(path) -> dict | None:
     """What the watcher last kept of the layout (config/codex-layout.json), or None where there is none or it cannot be
     read: {"format", "code_version", "engine_version", "app_version", "layout", "catalogued", "last_good",
     "updated_from", "unpaired_after_update"} - `last_good` the last look that paired, with the version of this product,
-    of the engine and of the app it was made on."""
+    of the engine and of the app it was made on.
+
+    Fourth round (audit-standards E2, audit-security D1): read fail-closed, like the other state files - a file over
+    READ_MOST bytes, nested past what the reader takes or of another shape is None, and only the closed shape is kept
+    (counts that are ints, flags that are bools, words that are printable text), whatever another version or a hand
+    edit put there. A file read here never ends the watcher."""
     try:
-        found = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError, TypeError):
+        with open(path, "rb") as stream:
+            data = stream.read(READ_MOST + 1)
+        if len(data) > READ_MOST:
+            return None
+        found = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError, TypeError, RecursionError, MemoryError):
         return None
-    return found if isinstance(found, dict) and found.get("format") == FORMAT else None
+    if not isinstance(found, dict) or type(found.get("format")) is not int or found["format"] != FORMAT:
+        return None
+    last = found.get("last_good")
+    return {"format": FORMAT, "code_version": _word(found.get("code_version")),
+            "engine_version": _word(found.get("engine_version")), "app_version": _word(found.get("app_version")),
+            "layout": _layout(found.get("layout")), "catalogued": _flag(found.get("catalogued")),
+            "last_good": ({"code_version": _word(last.get("code_version")),
+                           "engine_version": _word(last.get("engine_version")),
+                           "app_version": _word(last.get("app_version")), "layout": _layout(last.get("layout"))}
+                          if isinstance(last, dict) else None),
+            "updated_from": _word(found.get("updated_from")),
+            "unpaired_after_update": _flag(found.get("unpaired_after_update"))}
+
+
+# The most a kept layout file may hold: what this version writes is under 2 KB.
+READ_MOST = 16384
+_COUNTS = ("mains", "helpers", "engines_under_main", "engines_under_helper", "engines_elsewhere")
+_FLAGS = ("renamed_main", "engine_in_package", "paired")
+
+
+def _flag(value):
+    return value if type(value) is bool else None
+
+
+def _layout(value) -> dict:
+    """A kept snapshot's closed shape: each count an int from 0 (anything else 0), each flag a bool or None, the app's
+    version a word, the shape one of SHAPES' or None."""
+    value = value if isinstance(value, dict) else {}
+    kept = {name: (value.get(name) if type(value.get(name)) is int and 0 <= value[name] < 10 ** 6 else 0)
+            for name in _COUNTS}
+    kept.update({name: _flag(value.get(name)) for name in _FLAGS})
+    shape = value.get("shape")
+    kept.update(app_version=_word(value.get("app_version")),
+                shape=shape if isinstance(shape, str) and shape in SHAPES.values() else None)
+    return kept
 
 
 def _write(path, value) -> None:
@@ -118,6 +163,7 @@ class Watch:
         self.clock = clock or time.monotonic
         self._starting_since = None         # the first of the looks running that found the app "starting"
         self._untested = None               # whether the last look was one of a layout not tested on
+        self._found, self._found_at = None, None    # the last snapshot looked at, and when it was first
         before = read(path) or {}
         self._kept = before
         self._key = None
@@ -132,7 +178,12 @@ class Watch:
         if not isinstance(found, dict):
             return None
         app_open = found.get("mains", 0) > 0 or found.get("helpers", 0) > 0
-        at = self.clock()
+        # Audit-reachability I1: the watcher looks at the backend's last snapshot every tick, and only a record the
+        # engine checks makes a new one. A snapshot looked at again is no new look: it is judged as at its first look,
+        # so one old "starting" look never runs out the K8 count.
+        if found is not self._found:
+            self._found, self._found_at = found, self.clock()
+        at = self._found_at
         if found.get("shape") == "starting":
             if self._starting_since is None or at < self._starting_since:
                 self._starting_since = at
