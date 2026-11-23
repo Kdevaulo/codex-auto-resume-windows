@@ -76,7 +76,7 @@ class HiddenWordTests(unittest.TestCase):
 
     def test_ordinary_words_are_not(self):
         for sentence in ("Every day the watcher checks; a press on Retry asks now.", "Monday to Friday, days, pressed",
-                         "Birthdays-style words inside a word: newyearly, christmastime, pressing", "a #EE84689 hash"):
+                         "words with a day inside them: newyearly, christmastime, pressing", "a #EE84689 hash"):
             with self.subTest(sentence=sentence):
                 self.assertIsNone(self.refused(sentence))
 
