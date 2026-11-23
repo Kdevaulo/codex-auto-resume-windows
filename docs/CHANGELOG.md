@@ -120,7 +120,8 @@ the last Codex layout it looked at - and `selfcheck.json` - its judgement of its
 - **Start right after a reset keeps a full weekly window's occasion a window past its reset, wakes the PC for it and reads a
   `config.toml` with a byte-order mark.** A PC asleep through the old ten minutes ended the occasion unread and the chain with it. The
   statements say which of the person's programs may run - the request switches off their MCP servers, hooks, plugins, apps and notify
-  program, and is sent once more without that where Codex refuses it - and the guide gives the request as it is.
+  program, and is sent once more without that where Codex refuses it, and where the Codex home's `config.toml` cannot be read here its
+  MCP servers may run - and the guide gives the request as it is.
 - **Account switching settles a switch whose account was read only at a later look as fully as one seen made at once**, and never takes a
   terminal's engine for the app's because the app was given its dead shell's id.
 - **The Python choice is tidier and bounded.** A runtime left whole when the choice was turned off goes at the next start, and no sweep
