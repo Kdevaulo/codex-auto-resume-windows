@@ -212,7 +212,9 @@ def expect(case, tl) -> Expectation:
         continuation. A held message never expires while the stop holds it.
     (3) No message held: the stop's continuation goes once, when every held window has reset (usage_pause).
     (4) V4: with Continue after the reset off, a stopped conversation with a held message still gets that one turn,
-        under (2); without one nothing goes, and a notice asks for Resume.
+        under (2); without one nothing goes, and a notice asks for Resume. A message due after every held window has
+        reset, the paused queue still holding because no turn went, is carried by the stop's own turn at its due time,
+        once, letting that queue go - never queued by core (the coordinator's call from V4).
     (5) Resume pressed before the reset ends the hold (the coordinator's call from V1): no stop's turn, and the message
         goes by reset_message's usual route at its own reset, its day counted from the Resume.
     (6) A message due after the stop's continuation went goes through core at its own reset.
@@ -274,10 +276,12 @@ def expect(case, tl) -> Expectation:
             if continue_on:
                 found.turn = "continuation"
             else:
-                found.owner = ("V4, Continue after the reset off: the message falls due after every held window has "
-                               "reset, the queue still paused - whether the one turn carries it then is in no answer")
-                found.ends[label] = "owner"
-                break
+                # The coordinator's call from V4: no turn went, so the stop's paused queue still holds; the stop's own
+                # turn carries the message at its due time, once, and lets that queue go - never core's queue.
+                found.turn = "message:" + label
+                found.ends[label] = "delivered"
+                found.at[label] = finished_at = tl.look(max(due, blocked_until))
+                continue
         # handed to core at its own reset: usage must be available, nothing standing in the way
         sends_at = tl.look(max(due, blocked_until))
         expires_at = min(due + DAY, written + 8 * DAY) if index == 0 else due + DAY
