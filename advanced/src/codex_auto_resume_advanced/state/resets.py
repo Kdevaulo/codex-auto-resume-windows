@@ -600,10 +600,10 @@ class ResetsHandle:
             "carried_message": writing(lambda rule_id, started: carried(rule_id, started)),
             # review4 V2: a message the stop's turn would carry, in a conversation that is archived or gone - ended as
             # one not started, in reset_message's own word.
-            "message_not_started": writing(lambda rule_id: not_started(rule_id)),
+            "message_not_started": writing(lambda rule_id: gone_uncarried(rule_id)),
         }
 
-        def not_started(rule_id):
+        def gone_uncarried(rule_id):
             rule = state.reset_rule(rule_id)
             if (rule is None or rule["capability"] != MESSAGE or rule["state"] != RuleState.READY
                     or rule["record_state"] != RecordState.WAITING):
