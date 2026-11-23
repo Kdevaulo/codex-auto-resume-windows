@@ -58,7 +58,7 @@ the last Codex layout it looked at - which an earlier version ignores.
   with 125,000-character notes, every character escaped as six). A page over 32 MiB is refused before it is parsed and offers nothing.
   Installed older versions keep their own bounds - 2 MiB up to v0.6.22 and 8 MiB from v0.6.23 to v0.6.25 - which is why this takes
   effect from the version you install, not from the one you update from. SECURITY says it in both languages.
-- **The Settings window no longer dies in its own corner.** A crash in the window's rounded-corner companion, seen on a CI runner, is
+- **The Dashboard no longer crashes in its own rounded corner.** A crash in the window's rounded-corner companion, seen on a CI runner, is
   fixed: it never writes outside the picture it owns, and it is made only on the window's thread.
 - **A dialog stays with what was typed in it when Show desktop minimises the window under it** - Schedule a message, Message for this
   conversation, Add words, a value of one's own and Rename no longer vanish with their text. A window held by a dialog or by the setup
