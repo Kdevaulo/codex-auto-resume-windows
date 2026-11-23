@@ -120,6 +120,7 @@ class Watch:
         self.clock = clock or time.monotonic
         self._starting_since = None         # the first of the looks running that found the app "starting"
         self._untested = None               # whether the last look was one of a layout not tested on
+        self._found, self._found_at = None, None    # the last snapshot looked at, and when it was first
         before = read(path) or {}
         self._kept = before
         self._key = None
@@ -134,7 +135,12 @@ class Watch:
         if not isinstance(found, dict):
             return None
         app_open = found.get("mains", 0) > 0 or found.get("helpers", 0) > 0
-        at = self.clock()
+        # Audit-reachability I1: the watcher looks at the backend's last snapshot every tick, and only a record the
+        # engine checks makes a new one. A snapshot looked at again is no new look: it is judged as at its first look,
+        # so one old "starting" look never runs out the K8 count.
+        if found is not self._found:
+            self._found, self._found_at = found, self.clock()
+        at = self._found_at
         if found.get("shape") == "starting":
             if self._starting_since is None or at < self._starting_since:
                 self._starting_since = at
