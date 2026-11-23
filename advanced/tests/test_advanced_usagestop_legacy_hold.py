@@ -7,8 +7,11 @@ choice: after a downgrade to v0.6.25 or v0.6.26-beta the continuation the person
 the reset. The hold is now kept with no words (state.add_held_continuation); the message's words come from its rule.
 
 The older code is read from the tags, out of git and nothing else, as tests/test_legacy_bootstraps.py reads old trees:
-v0.6.25's and v0.6.26-beta's whole UsageStop is run on the state this version writes, and every tagged usage_pause's
-`_waiting` is asked what it would start. Where the tags are not in the checkout, CI fails and a local checkout skips.
+v0.6.25's and v0.6.26-beta's whole UsageStop is run on the state this version writes, and the `_waiting` of every
+usage_pause tagged before v0.6.26-beta.2 is asked what it would start. v0.6.26-beta.2's own tag, and every later one,
+carries the stop that keeps the hold with no words and reads it by its rule (the cases of ContinueOffCase), and the
+release run is the first to see that tag: it is left out by its version.
+Where the tags are not in the checkout, CI fails and a local checkout skips.
 
     CODEX_AR_EDITION=advanced PYTHONPATH="src;advanced/src;advanced/tests;tests" python -m unittest test_advanced_usagestop_legacy_hold
 """
@@ -17,6 +20,7 @@ from __future__ import annotations
 import importlib.util
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import types
@@ -33,6 +37,19 @@ from test_advanced_usagestop_continue_off import ContinueOffCase  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = "advanced/src/codex_auto_resume_advanced/engine/usagestop.py"
 RUN = ("v0.6.25", "v0.6.26-beta")
+# The first version whose hold has no words (review6 A1). Its tag and every later one hold this rule; the tags before it
+# are the older code a person can go back to.
+WORDLESS = (0, 6, 26, 1, 2)
+_TAG = re.compile(r"v(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)(?:\.(\d+))?)?$")
+
+
+def _version(tag):
+    """A release tag's place in the product's order (alpha, alpha.N, beta, beta.N, final); None for any other name."""
+    found = _TAG.match(tag)
+    if found is None:
+        return None
+    major, minor, patch, stage, n = found.groups()
+    return (int(major), int(minor), int(patch), {"alpha": 0, "beta": 1, None: 2}[stage], int(n or 1))
 
 
 def _git(*arguments) -> bytes | None:
@@ -41,10 +58,16 @@ def _git(*arguments) -> bytes | None:
     return done.stdout if done.returncode == 0 else None
 
 
+def older(names) -> list:
+    """The release tags among `names` that come before v0.6.26-beta.2, oldest first."""
+    return [name for _key, name in sorted((_version(name), name) for name in names
+                                          if _version(name) is not None and _version(name) < WORDLESS)]
+
+
 def tags() -> list:
-    """Every tag whose tree has usage_pause's stop (engine/usagestop.py), oldest first by git's version order."""
-    listed = (_git("tag", "--list", "v*", "--sort=version:refname") or b"").decode("utf-8").split()
-    return [tag for tag in listed if _git("cat-file", "-e", "%s:%s" % (tag, SOURCE)) is not None]
+    """Every release tag before v0.6.26-beta.2 whose tree has usage_pause's stop (engine/usagestop.py), oldest first."""
+    listed = (_git("tag", "--list", "v*") or b"").decode("utf-8").split()
+    return [tag for tag in older(listed) if _git("cat-file", "-e", "%s:%s" % (tag, SOURCE)) is not None]
 
 
 def legacy(tag) -> types.ModuleType:
@@ -97,16 +120,25 @@ class LegacyHold(ContinueOffCase):
                 self.setUp()
 
     def test_no_tagged_usage_pause_would_start_it(self):
-        """Every tagged usage_pause's own `_waiting` - what its after_reset starts - leaves the hold out."""
+        """The own `_waiting` - what its after_reset starts - of every usage_pause tagged before v0.6.26-beta.2 leaves
+        the hold out."""
         _need_tags(self)
         plug, _turn, _row = self.held()
         code = self.code(plug)
         found = tags()
         self.assertGreaterEqual(len(found), 20)
+        self.assertEqual(found[-1], "v0.6.26-beta")
         for tag in found:
             with self.subTest(tag):
                 self.assertEqual(legacy(tag).UsageStop._waiting(code), [])
         self.assertIsNotNone(usagestop)
+
+    def test_the_tags_asked_end_before_the_wordless_hold(self):
+        """Fails with every tag asked: v0.6.26-beta.2's own tag (the release run's first sight of it) carries this
+        version's stop, whose `_waiting` holds the wordless row on purpose."""
+        names = ["v0.6.25", "v0.6.26-alpha", "v0.6.26-beta", "v0.6.26-beta.2", "v0.6.26-beta.3", "v0.6.26",
+                 "v0.6.27-alpha", "v0.6.3", "w1"]
+        self.assertEqual(older(names), ["v0.6.3", "v0.6.25", "v0.6.26-alpha", "v0.6.26-beta"])
 
 
 if __name__ == "__main__":
