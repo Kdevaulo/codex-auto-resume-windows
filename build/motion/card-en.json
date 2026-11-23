@@ -8,14 +8,14 @@
   "canvas": {
     "size": [
       776,
-      608
+      578
     ],
     "transparent": true,
     "theme": "light",
     "design": "soft"
   },
   "taskbar": {
-    "top": 512,
+    "top": 482,
     "height": 96,
     "colour": "#EEF0F3",
     "edge": 748,

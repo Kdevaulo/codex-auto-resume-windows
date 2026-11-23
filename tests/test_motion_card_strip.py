@@ -56,7 +56,9 @@ class PlanTests(unittest.TestCase):
     def test_the_canvas_is_the_old_picture_with_the_gap_and_the_strip_under_it(self):
         from codex_auto_resume import brand
         gap = int(round(brand.SPACING["m"] * SCALE))
-        heights = {"card-en": 436, "card-ko": 420}          # the card's own height at 200 %
+        # The card's own height at 200 %. v0.6.26-beta.2 (audit4 F1): the English card is set in Segoe UI now, as an
+        # English Windows sets it, not in this machine's Malgun Gothic Latin - 30 px shorter than the 436 it was.
+        heights = {"card-en": 406, "card-ko": 420}
         for name in NAMES:
             with self.subTest(name):
                 plan = plan_of(name)

@@ -150,18 +150,18 @@
       "size": "776x592"
     },
     "docs/images/notification-card-motion.png": {
-      "bytes": 1760141,
+      "bytes": 1759838,
       "frames": 461,
       "ms": 13200,
       "scenes": {
-        "C0": 125323,
+        "C0": 125020,
         "C1": 327482,
         "C2": 4755,
         "C3": 1232438,
         "C4": 70040
       },
-      "sha256": "1b0d95f53c16c673e9c5543267f05f499e54be36ec54943010c9149fa5015eb4",
-      "size": "776x608"
+      "sha256": "021006f1bfaa98cd299241d718dfaf94ff551ac946250095098b9ebf7d077e98",
+      "size": "776x578"
     },
     "docs/images/readme-motion-ko.png": {
       "bytes": 9532805,
@@ -259,7 +259,7 @@
     }
   },
   "inputs": {
-    "<motion:card-en>": "693a50104613cbf11d9b938d6987f92305e820618f8d8a92e348d21f6ea2bdad",
+    "<motion:card-en>": "d57fe7e36a4525ad685f1dcd76e0989c5a4e7f172b3bc2d6b17094af66bebedb",
     "<motion:card-ko>": "641dc921a3ca0a3a6a5d370d6a525cce5ec5b20e3db596a7d8a82560e10123b0",
     "<motion:logo-dark>": "5aeb49f26d268159d57646004912d7c23bb07f35262d41592979663117cb7b47",
     "<motion:logo-light>": "415252d0f16fb2bbb73d57919364cc76ba3a112be9454d7d64dac19781314a9e",
