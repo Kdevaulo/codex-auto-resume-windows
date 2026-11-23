@@ -19,7 +19,12 @@ What each case must come to is worked out here from the sources alone, never fro
   when it was written for the other limit");
 - the owner's decisions: 2026-11-22 "the reset message only" (never both), 2026-11-23 B3 (a stopped conversation's
   message of either window is held for the stop's own after-reset turn and carried by it) and B5 (that turn skips the
-  usual checks and the day's count);
+  usual checks and the day's count); and the owner's answers after this sweep's first run (2026-11-23): V1, the held
+  message waits until EVERY window the stop holds has reset and is then carried by the stop's own turn, once - no turn
+  while a held window holds, no separate continuation; V4, with Continue after the reset off a stopped conversation
+  with a reset message still gets that one turn under V1, and without one nothing goes; a held message never expires
+  while the stop holds it; and the coordinator's call from V1, Resume pressed before the reset ends the hold, the
+  message then going by reset_message's usual route at its own reset;
 - the fixed rules: only the watcher sends, the exact thread, nothing on the off chance, a person's words never deleted
   unsent without being told, nothing into the paused queue from core for a conversation the stop paused.
 Where the sources disagree or say nothing, a case is marked `owner` and only the invariants every source agrees on are
@@ -27,8 +32,8 @@ held (the report, plans/v0626-audit4/matrix5.md, lists them as "needs the owner"
 
 The invariants held in every case: (a) at most one start the app receives per conversation per reset; (b) a message's
 words written at most once, never deleted unsent without the person being told, never expired while the stop holds them;
-(c) no continuation beside a message; (d) nothing sent by core into the queue the stop paused; (e) no start while the
-window it waits for still holds; (f) the journal and the page say what happened; (g) a restart changes none of it.
+(c) no continuation beside a message; (d) nothing sent by core into the queue the stop paused; (e) no start while a
+window the stop holds still holds; (f) the journal and the page say what happened; (g) a restart changes none of it.
 
     CODEX_AR_EDITION=advanced PYTHONPATH="src;advanced/src;advanced/tests;tests" python -B -m unittest test_advanced_matrix_stop_reset
 """
@@ -182,44 +187,63 @@ class Expectation:
     person_runs: bool = False                       # the person's own queued item runs, once
 
 
-def expect(case, tl) -> Expectation:
-    """From the sources, never from the code: (1) with no stop, a message goes through core at its reset, once usage is
-    available and nothing stands in the way, or expires a day after it fell due (eight days after it was written). (2) A
-    stop's continuation goes once, when every window held has reset (usage_pause: "no further continuation until the
-    window resets"). (3) A message due while that continuation waits - of either window (B3) - is carried by the stop's
-    turn in its place (2026-11-22: never both), once the stop's own window has reset (B1), past the usage checks (B5); it
-    never expires while it waits. (4) A message due after the continuation went goes through core at its own reset."""
-    found = Expectation()
+def held_windows(case, tl) -> set:
+    """The windows the stop holds: those over their stop percentage at the stop, and, where the read after the first
+    reset says another is over, that one too."""
     held = set(stop_windows(case))
     first = min(tl.resets.values())
-    if case.usage == "other_holds":
+    if case.usage == "other_holds" and case.stop != "none":
         held |= {minutes for minutes in (FIVE, WEEK) if tl.resets[minutes] > first}
-    chain = WEEK if case.stop == "weekly" else FIVE          # both cross in one reading: the 5-hour window's stop
-    reset_of = dict(tl.resets)
-    release = max(reset_of[minutes] for minutes in held) if case.stop != "none" else None
+    return held
+
+
+def release_of(case, tl):
+    """When every window the stop holds has reset (V1), or None with no stop."""
+    held = held_windows(case, tl)
+    return max(tl.resets[minutes] for minutes in held) if held else None
+
+
+def expect(case, tl) -> Expectation:
+    """From the sources, never from the code:
+    (1) No stop: a message goes through core at its reset, once usage is available and nothing stands in the way, or
+        expires a day after it fell due (eight days after it was written).
+    (2) V1 (the owner, 2026-11-23): a stopped conversation's reset message is held until EVERY window the stop holds has
+        reset; then the stop's own turn carries it, once - no turn while a held window still holds, and no separate
+        continuation. A held message never expires while the stop holds it.
+    (3) No message held: the stop's continuation goes once, when every held window has reset (usage_pause).
+    (4) V4: with Continue after the reset off, a stopped conversation with a held message still gets that one turn,
+        under (2); without one nothing goes, and a notice asks for Resume.
+    (5) Resume pressed before the reset ends the hold (the coordinator's call from V1): no stop's turn, and the message
+        goes by reset_message's usual route at its own reset, its day counted from the Resume.
+    (6) A message due after the stop's continuation went goes through core at its own reset.
+    Nothing goes on the off chance: a message that needs a window counted after the first reset waits (or expires)
+    where no read succeeds after it."""
+    found = Expectation()
+    first = min(tl.resets.values())
+    release = release_of(case, tl)
     blocked_until = tl.blocked[1] if tl.blocked else 0
     if case.variant == "app_closed_two_days":
-        blocked_until = reset_of[chain] + 2 * DAY
+        blocked_until = release + 2 * DAY
     usage_ok = case.usage in ("available", "other_holds")
     messages = message_windows(case)
-    cancel_at = {"turned_off": tl.t0 + 1800, "deleted": tl.t0 + 1800, "replaced": tl.t0 + 1800,
+    cancel_at = {"turned_off": tl.t0 + 1800, "deleted": tl.t0 + 1800,
                  "held_then_deleted": tl.t0 + HELD_CANCEL}.get(case.variant)
     if case.variant == "replaced":
         found.ends["A"] = "cancelled"
         messages = [("A2",) + tuple(messages[0][1:])] + messages[1:]
-        cancel_at = None
-    continuation_waits = case.stop != "none"
+    stopped = case.stop != "none" and case.variant != "resume_before"
+    continue_on = case.variant != "continue_off"
     if case.variant == "continue_off":
         found.notices.add("press_resume")
-        found.owner = ("Continue after the reset off: no stop's turn will come; whether a message due in the paused "
-                       "conversation waits for the person's Resume or goes elsewhere is in no source")
-        continuation_waits = False
-    go = tl.look(max(release, blocked_until)) if continuation_waits else None   # the look the continuation would go at
+    go = tl.look(max(release, blocked_until)) if stopped else None        # the look the stop's turn goes at
     written = tl.t0 - 6 * DAY if case.variant == "written_six_days_ago" else tl.t0
-    finished_at = None
+    hold_open, finished_at = stopped, None
     for index, (label, minutes, ordinal) in enumerate(messages):
         if index == 0:
             due = tl.nth_reset(minutes, ordinal)
+            if not usage_ok and ordinal > 1:
+                found.ends[label] = "unsent"          # its window opens after the first reset: never counted
+                break
         else:
             if finished_at is None:
                 break                                 # the second one is written once the first has gone
@@ -227,41 +251,33 @@ def expect(case, tl) -> Expectation:
                 found.ends[label] = "unsent"          # no read succeeds after the reset: nothing on the off chance
                 break
             due = tl.reset_after(minutes, finished_at)
-        if case.variant == "resume_before" and index == 0:
-            if due < reset_of[chain]:
-                found.owner = ("Resume pressed before the reset: the statement says the message waits for the stop's "
-                               "reset, but no stop's turn comes to carry it")
-            found.core.append(label)
-            found.ends[label] = "delivered"
-            found.at[label] = finished_at = max(due, reset_of[chain])
-            continuation_waits, go = False, None
-            continue
-        if continuation_waits and due <= go:
-            # due at or before the look the continuation would go at (a PC asleep through both resets wakes to both)
-            # B3/B5: due while the stop's continuation waits - carried by the stop's turn, in its place, once its own
-            # window has reset (B1), whatever the usage read says.
-            when = tl.look(max(reset_of[chain], due, blocked_until))
-            if cancel_at is not None and cancel_at < when:
+        if hold_open and due <= go:
+            # V1: held until every held window has reset, then carried by the stop's turn, once.
+            if cancel_at is not None and cancel_at < go:
                 found.ends[label] = "cancelled"
                 break
+            hold_open = False
             if case.variant == "queue_core":
                 found.ends[label] = "delivered"           # in the paused queue already; it runs at the person's Resume
                 found.notices.add("press_resume")
-                continuation_waits = False
                 break
             if case.variant == "not_received":
                 found.ends[label] = "unproven"            # its words written once, never again; nothing shows it came
                 found.notices.add("press_resume")
-                continuation_waits = False
                 break
             found.turn = "message:" + label
             found.ends[label] = "delivered"
-            found.at[label] = finished_at = when
-            continuation_waits = False
+            found.at[label] = finished_at = go
             continue
-        if continuation_waits:
-            found.turn = "continuation"
-            continuation_waits = False
+        if hold_open:
+            hold_open = False
+            if continue_on:
+                found.turn = "continuation"
+            else:
+                found.owner = ("V4, Continue after the reset off: the message falls due after every held window has "
+                               "reset, the queue still paused - whether the one turn carries it then is in no answer")
+                found.ends[label] = "owner"
+                break
         # handed to core at its own reset: usage must be available, nothing standing in the way
         sends_at = tl.look(max(due, blocked_until))
         expires_at = min(due + DAY, written + 8 * DAY) if index == 0 else due + DAY
@@ -278,12 +294,13 @@ def expect(case, tl) -> Expectation:
             # Usage never readable after the reset: nothing goes on the off chance. Whether it waits or expires a day on
             # is in no statement; either is held by the invariants (the page and the journal say which).
             found.ends[label] = "unsent"
-    if continuation_waits:
+    if hold_open and continue_on:
         found.turn = "continuation"
     if case.variant == "app_closed_two_days":
         found.notices.add("not_continued")
     if case.variant == "queue_person":
         found.person_runs = True
+    found.ends = {label: end for label, end in found.ends.items() if end != "owner"}
     return found
 
 
@@ -394,8 +411,7 @@ class World:
     def app_closed(self) -> bool:
         if self.case.variant != "app_closed_two_days":
             return False
-        chain = WEEK if self.case.stop == "weekly" else FIVE
-        reset = self.tl.resets[chain]
+        reset = release_of(self.case, self.tl)
         return reset - 600 <= self.h.now < reset + 2 * DAY
 
     def _stop(self, thread, turn, gate=None):
@@ -518,8 +534,7 @@ class World:
         if tl.blocked:
             points |= {tl.blocked[0], tl.blocked[1] + 1, tl.blocked[1] + 62, tl.blocked[1] + 123}
         if case.variant == "app_closed_two_days":
-            chain = WEEK if case.stop == "weekly" else FIVE
-            end = tl.resets[chain] + 2 * DAY
+            end = release_of(case, tl) + 2 * DAY
             points |= {end + 1, end + 62, end + 123, end + 3700, end + 3761}
         if case.variant == "held_then_deleted":
             points.add(tl.t0 + HELD_CANCEL)
@@ -666,6 +681,13 @@ class World:
 
 
 # ---------------------------------------------------------------------------------------------------- the checks
+COUNTED = {"run": 0, "pruned": 0}
+
+
+def tearDownModule():
+    sys.stderr.write("\nmatrix: %(run)d cases run, %(pruned)d pruned\n" % COUNTED)
+
+
 class MatrixCase(StopCase):
     BESIDE = (USAGE_METER, RESET_MESSAGE)
 
@@ -679,7 +701,9 @@ class MatrixCase(StopCase):
         for case in cases:
             why = pruned(case)
             if why is not None:
+                COUNTED["pruned"] += 1
                 continue
+            COUNTED["run"] += 1
             with self.subTest(case.name):
                 self.check(case)
 
@@ -754,24 +778,15 @@ class MatrixCase(StopCase):
             if send["paused"] and not send.get("older"):
                 self.fail("%s (d): core sent %s into the paused queue at %+d s" %
                           (name, world.label_of(send["text"]), send["at"] - tl.t0))
-        # (e) no start while the window it waits for still holds
-        held = set(stop_windows(case))
-        first = min(tl.resets.values())
-        if case.usage == "other_holds":
-            held |= {minutes for minutes in (FIVE, WEEK) if tl.resets[minutes] > first}
-        chain = WEEK if case.stop == "weekly" else FIVE
+        # (e) no start while a window the stop holds still holds (V1: for the carried message as for the continuation)
+        held = held_windows(case, tl)
         for start in seen["written"]:
-            label = world.label_of(start["text"])
-            if label == "continuation":
-                late = [minutes for minutes in held if start["at"] < tl.resets[minutes]]
-                self.assertEqual(late, [], "%s (e): the continuation started at %+d s while %s held" %
-                                 (name, start["at"] - tl.t0, late))
-            else:
-                self.assertGreaterEqual(start["at"], tl.resets[chain], "%s (e): %s carried at %+d s before the "
-                                        "stop's window reset" % (name, label, start["at"] - tl.t0))
+            late = [minutes for minutes in sorted(held) if start["at"] < tl.resets[minutes]]
+            self.assertEqual(late, [], "%s (e): %s started at %+d s while %s held" %
+                             (name, world.label_of(start["text"]), start["at"] - tl.t0, late))
         # (f) a stop's continuation still waiting at the end is explained by a notice
         for stop in stops:
-            if stop["finished_at"] is None and case.variant not in ("continue_off",):
+            if stop["finished_at"] is None:
                 self.assertTrue(seen["notices"] & {"press_resume", "not_continued"},
                                 "%s (f): the stop's continuation still waits at the end and nothing says why" % name)
 
