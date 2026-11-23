@@ -271,7 +271,10 @@ class UsageStop(UsagePause):
         going = self._continue_on()
         for row in waiting:
             thread = row["thread_id"]
-            unsure = row["record_id"] in self._unsure
+            # review4 V3: a carried start in doubt is kept in the state (`doubt`), so a restart inside the backoff still
+            # waits it out and asks for Resume, never taking it as sent.
+            doubted = row.get("launching_at")
+            unsure = row["record_id"] in self._unsure or _time(doubted)
             if not _reset_since(rows, row["chain"], row["created_at"], now) or (held and not unsure):
                 # review4 V2: newer work before the reset - the person's Resume let the paused queue go - ends the
                 # stop's hold now, not at the reset: a message it held then goes by reset_message's own route at its
@@ -321,7 +324,8 @@ class UsageStop(UsagePause):
                 # backoff no turn of it is there. Its words are gone - it may yet arrive, and is never sent twice - so the
                 # person is asked to press Resume, as for a message in the paused queue, and this waits: a chat message
                 # there is still left with Codex, and their Resume ends it as newer work.
-                if not self._unsure[row["record_id"]] and now >= self._backoff.get(row["record_id"], (0, 0))[1]:
+                again = self._backoff.get(row["record_id"], (0, (doubted or now) + BACKOFF_SECONDS))[1]
+                if not self._unsure.get(row["record_id"]) and now >= again:
                     self._unsure[row["record_id"]] = True                            # said once
                     if self._notice("press_resume", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"}):
                         self._count("resume_unproven")
@@ -425,6 +429,10 @@ class UsageStop(UsagePause):
                 self._unsure[row["record_id"]] = False
                 self._backoff[row["record_id"]] = (failures + 1,
                                                    now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))
+                try:
+                    handle.doubt(row["answer_id"])
+                except Exception:
+                    pass
                 return
             self._backoff.pop(row["record_id"], None)
             handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)
