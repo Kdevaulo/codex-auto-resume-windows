@@ -10,6 +10,7 @@ Read from the window's own source by its braces (tests/guiscan.py); nothing is c
 """
 from __future__ import annotations
 
+import re
 import unittest
 
 import guiscan
@@ -51,6 +52,18 @@ class ClosedBeforeTheListTests(unittest.TestCase):
         listing_part = source[source.index("private void OpenVersions()"):source.index("private void ShowVersionRows(")]
         self.assertEqual(listing_part.count("SetBusy(false);"), 1, "in EndVersionsWait alone")
         self.assertEqual(listing_part.count("SetBusy(true);"), 1, "as the listing starts")
+
+
+class TheWaitSaidTests(unittest.TestCase):
+    def test_the_comment_on_an_answer_that_did_not_come_says_the_wait_there_is(self):
+        """It said "three minutes" from the 180-second wait after the wait became 430 seconds (fourth-round audit J5)."""
+        source = (guiscan.ROOT / "gui" / "DashboardVersions.cs").read_text(encoding="utf-8")
+        wait = int(re.search(r"private const int ListMilliseconds = (\d+);", source).group(1))
+        listing = body("StartVersionsListing")
+        said = re.search(r"// Still asking after (\d+) seconds \(ListMilliseconds\)", listing)
+        self.assertIsNotNone(said, "the wait said in seconds, by the constant's name")
+        self.assertEqual(int(said.group(1)) * 1000, wait)
+        self.assertNotIn("three minutes", listing)
 
 
 if __name__ == "__main__":

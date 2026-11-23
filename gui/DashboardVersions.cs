@@ -184,8 +184,8 @@ namespace CodexAutoResume
                 string releases = ran == "done" ? ReleasesLine(printed) : null;
                 List<string[]> rows = new List<string[]>();
                 string[] listed = null;
-                // Still asking after three minutes is an answer that did not come; nothing the bootstrap did not print
-                // is ever read as a list.
+                // Still asking after 430 seconds (ListMilliseconds) is an answer that did not come; nothing the bootstrap
+                // did not print is ever read as a list.
                 string state = ran == "done" ? VersionsLines(printed, code, out rows, out listed)
                              : ran == "running" ? "unavailable" : "unreadable";
                 MethodInvoker apply = delegate
