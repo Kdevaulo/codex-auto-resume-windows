@@ -61,6 +61,14 @@ COURIER_IMPORT = re.compile(r"^\s*from \. import (?:[a-z_]+, )*http\b", re.MULTI
 COURIER_HOSTS = re.compile(r"^https://(?:api\.telegram\.org/bot|status\.openai\.com/api/v2/summary\.json$)"
                            # v0.6.22: the loopback web view's own address, formed where it is served from.
                            r"|^http://%s:%d/$")
+# Read by the URL test since it reads every shipped tree (audit4 D4, E7), and found there on 2026-11-23:
+# - the window's and the setup program's manifests (gui/app.manifest, build/setup/setup.manifest) name the XML namespaces
+#   of Windows' settings by their http:// names. A namespace is a name Windows compares; nothing fetches it.
+MANIFEST_NAMESPACE = re.compile(r"^http://schemas\.microsoft\.com/SMI/20(?:05|16)/WindowsSettings$")
+# - the advanced page's example of the loopback web view (advanced/gui/AdvancedExamples.cs) shows the address the view is
+#   served at, as text in a drawn example: this PC's loopback and a private LAN address. Nothing connects to them.
+EXAMPLE_ADDRESSES_IN = "advanced/gui/AdvancedExamples.cs"
+EXAMPLE_ADDRESSES = re.compile(r"^http://(?:127\.0\.0\.1|192\.168\.0\.2):47615/$")
 # What listens, in any shipped language: a socket's own calls, the standard library's servers, .NET's listeners. Python's
 # `bind` and `listen` are looked for as calls on something, so a word in a sentence is not one.
 LISTENING = re.compile(r"\.listen\(|\.bind\(\(|\bsocket\.socket\(|\b(?:Threading)?HTTPServer\b|\bTCPServer\b|\bUDPServer\b"
