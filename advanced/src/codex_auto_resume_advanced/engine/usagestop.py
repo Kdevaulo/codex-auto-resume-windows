@@ -353,6 +353,17 @@ class UsageStop(UsagePause):
                 continue
             if latest.status not in FINAL or found[0] == QUEUED:
                 continue
+            if found[0] == CONTINUE and not (going and row["words"]) and row["words"]:
+                # review6 A2: Continue after the reset was on at the stop and is off now. Nothing will start here, and
+                # the paused queue stays paused: the person is asked to press Resume, as the stop asks where the choice
+                # was off from the start, and the row is kept as a hold with no words from here on.
+                try:
+                    handle.unword(row["answer_id"])
+                except Exception:
+                    pass
+                if self._notice("press_resume", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"}):
+                    self._count("resume_unproven")
+                continue
             if found[0] == CONTINUE and not (going and row["words"]):
                 # review4 V4: Continue after the reset off - nothing of the product's own goes. This waits with the
                 # paused queue, so a reset message of the conversation falling due later is still carried by this turn

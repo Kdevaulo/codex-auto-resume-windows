@@ -187,6 +187,18 @@ class ContinuationsMixin:
                 return None
             return {"capability": row["capability"], "trip": move == "unproven"}
 
+    def hold_continuation(self, answer_id, capability) -> bool:
+        """review6 A2: a waiting continuation of `capability` kept from now on as a hold with no words (as
+        `add_held_continuation` keeps one) - usage_pause's stop whose Continue after the reset was turned off before the
+        reset. Whether it was."""
+        _key(answer_id, "answer id")
+        with self._transaction(create=False) as connection:
+            if connection is None:
+                return False
+            return connection.execute(
+                "UPDATE continuations SET words=NULL WHERE answer_id=? AND capability=? AND finished_at IS NULL",
+                (answer_id, _capability(capability))).rowcount == 1
+
     def doubt_continuation(self, answer_id, capability, at=None) -> bool:
         """review4 V3: a waiting continuation of `capability` whose turn carried a message the app may not have received
         (usage_pause's unconfirmed carry, audit4 B4) - marked in `launching_at`, which no such continuation otherwise
@@ -350,6 +362,8 @@ class ContinuationsHandle:
                                                     chain=chain)),
             "end": writing(lambda reason, *, thread_id=None: state.end_continuations(reason, capability=capability,
                                                                                      thread_id=thread_id)),
+            # review6 A2: its words given up, kept as a hold (Continue after the reset turned off after the stop).
+            "unword": writing(lambda answer_id: state.hold_continuation(answer_id, capability)),
             # review4 V3: usage_pause's carried start in doubt, kept across a restart.
             "doubt": writing(lambda answer_id: state.doubt_continuation(answer_id, capability)),
             # keep_going's own (engine/keepgoing.py).
