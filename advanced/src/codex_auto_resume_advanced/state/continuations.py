@@ -203,15 +203,16 @@ class ContinuationsMixin:
         """review4 V3: a waiting continuation of `capability` whose turn carried a message the app may not have received
         (usage_pause's unconfirmed carry, audit4 B4) - marked in `launching_at`, which no such continuation otherwise
         uses (they are never handed to core), so a restart still waits out the backoff and asks for Resume rather than
-        take the carry as sent. Whether it was marked."""
+        take the carry as sent. Its words go with it (review6 A4): an older version, which reads no doubt, then finds
+        nothing to start - v0.6.25 started the product's continuation beside the message. Whether it was marked."""
         _key(answer_id, "answer id")
         now = self._now(at)
         with self._transaction(create=False) as connection:
             if connection is None:
                 return False
             return connection.execute(
-                "UPDATE continuations SET launching_at=coalesce(launching_at, ?) WHERE answer_id=? AND capability=? "
-                "AND finished_at IS NULL", (now, answer_id, _capability(capability))).rowcount == 1
+                "UPDATE continuations SET launching_at=coalesce(launching_at, ?), words=NULL WHERE answer_id=? "
+                "AND capability=? AND finished_at IS NULL", (now, answer_id, _capability(capability))).rowcount == 1
 
     def end_continuations(self, reason, *, capability=None, thread_id=None, at=None) -> int:
         """Every continuation still waiting to be sent - of `capability`, of `thread_id`, or all - ended with
