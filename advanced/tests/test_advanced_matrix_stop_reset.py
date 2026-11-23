@@ -35,6 +35,13 @@ words written at most once, never deleted unsent without the person being told, 
 (c) no continuation beside a message; (d) nothing sent by core into the queue the stop paused; (e) no start while a
 window the stop holds still holds; (f) the journal and the page say what happened; (g) a restart changes none of it.
 
+Red on the engine of f3c7d7bff (403 cases run, 61 pruned, 39 red; plans/v0626-audit4/matrix5.md has every case):
+M4 (e, V1) the message carried at the 5-hour reset while the weekly window still holds (stop=both msg own/each/five2,
+21 cases); M1 (e) the stop's start on the reading from before the reset while the read in that tick shows the other
+window over (usage=other_holds, 10 cases); M2 (d, V4) with Continue after the reset off core queues the message into
+the paused queue (6 cases); M3 (b) a message counting for the stop's reset expires by the eight-day rule while the stop
+holds it (written_six_days_ago, 2 cases).
+
     CODEX_AR_EDITION=advanced PYTHONPATH="src;advanced/src;advanced/tests;tests" python -B -m unittest test_advanced_matrix_stop_reset
 """
 from __future__ import annotations
