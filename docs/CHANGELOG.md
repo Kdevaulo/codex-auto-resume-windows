@@ -44,8 +44,6 @@ the last Codex layout it looked at - and `selfcheck.json` - its judgement of its
   word names what it found instead of "Nothing else to do.". A usage read that broke, an error code Codex reported that this version
   does not know and a named engine the app does not run are each said. A Codex refusing a usage read - a signed-out account - no longer
   fails a protocol check; only a Codex that says it does not know the method does.
-- **A record that left Codex's queue is unproven an hour after the watcher's start, however often the watcher starts.** On a PC that is
-  shut down each night the day the record was given never ended, and the conversation's later records could not be claimed.
 - **Restore defaults never deletes the copy it has just set aside, whatever the clock says**, and keeps the newest five set-aside settings
   files and deletes the older ones. A settings string holding a lone surrogate is refused as a settings error, and an old file holding
   one no longer fails every save.
@@ -110,6 +108,9 @@ the last Codex layout it looked at - and `selfcheck.json` - its judgement of its
   every other queued message with its words. It is now found by its proof where no queue id is known, never sent again, and its day counts
   from when it was last seen there. A chat message in a queue the forced stop paused is left with Codex, never taken back with its words
   gone.
+- **A queued prompt, reset message or chat message that left Codex's queue is unproven an hour after the watcher's start, however often
+  the watcher starts.** On a PC that is shut down each night the day the message was given never ended, and the conversation's later
+  messages could not be claimed.
 - **Codex refusing a usage read turns nothing off for good.** One signed-out read used to turn every capability standing on the usage
   read off and store it off, and a later good read did not turn it back on. Where a Codex home loses its lock folder, the five
   capabilities that route by whether the app holds the conversation get that grade instead, and the page says so.
