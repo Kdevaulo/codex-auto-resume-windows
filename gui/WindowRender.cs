@@ -49,6 +49,9 @@ namespace CodexAutoResume
         private const int RenderSettleLimit = 20000;
         // How many lines a turn of the wheel scrolls in a picture: Windows' own default, whatever this machine says.
         internal const int RenderWheelLines = 3;
+        // v0.6.26 (fourth-round audit F2): the size of the window's font in a render whose scale the job pinned - Windows'
+        // own default for its message font, 9 points, regular - whatever this machine's message font is (RenderFont).
+        internal const float RenderPoints = 9f;
 
         /// Set on a window the render mode builds: it never starts another window of itself (Reopen).
         private bool rendering;
@@ -132,6 +135,10 @@ namespace CodexAutoResume
                 if (theme == null || design == null) throw new InvalidDataException("the job names no theme or design");
                 Theme.Opened = theme;
                 Design.Opened = design;
+                // v0.6.26 (fourth-round audit F2): never in High Contrast, whatever this machine says - on one with it on,
+                // every picture was drawn in the contrast palette and every glide cut (Soft.ReduceMotion) - so the picture
+                // is the same on any machine; the render stands its own answer in that input as a probe does.
+                Theme.HighContrastOn = delegate { return false; };
                 Palette.AdoptDesign(design);
                 Palette.Adopt(Theme.Current(theme));
                 AdoptRenderScale(job);
@@ -285,13 +292,13 @@ namespace CodexAutoResume
         /// (Typeface.ForLanguage: ko Malgun Gothic, ja Yu Gothic UI, zh-CN Microsoft YaHei UI, zh-TW Microsoft JhengHei UI,
         /// th Leelawadee UI, the rest Segoe UI). Before, the English pictures made on a Korean Windows kept its Malgun
         /// Gothic, which draws a backslash as a won sign. Null - the machine's own font, as before - in a render that pins
-        /// no scale.
+        /// no scale. v0.6.26 (fourth-round audit F2): at Windows' default size and style too (RenderPoints, regular), not
+        /// this machine's message font's.
         private static Font RenderFont()
         {
             if (!RenderPinned) return null;
-            Font box = SystemFonts.MessageBoxFont;
             Font face;
-            try { face = new Font(Typeface.Segoe, box.SizeInPoints, box.Style, GraphicsUnit.Point); }
+            try { face = new Font(Typeface.Segoe, RenderPoints, FontStyle.Regular, GraphicsUnit.Point); }
             catch (ArgumentException) { return null; }
             if (!string.Equals(face.FontFamily.Name, Typeface.Segoe, StringComparison.OrdinalIgnoreCase)) return null;
             return AtDisplayScale(TextScale.Apply(face, textRead, TextSize));
