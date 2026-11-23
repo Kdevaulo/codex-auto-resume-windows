@@ -114,7 +114,7 @@ class _StopErrand:
 class UsageStop(UsagePause):
     """usage_pause's code from v0.6.16-beta.4: the pause's holding, and the forced stop and its continuation after
     the reset. `stop`, `start` and `home` are seams a test fills (ipc.stop_turn, ipc.start_turn, the Codex home)."""
-    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff", "_stopped")
+    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff", "_stopped", "_unsure")
 
     def __init__(self, paths, *, stop=None, start=None, home=None):
         super().__init__(paths)
@@ -124,6 +124,7 @@ class UsageStop(UsagePause):
         self._notices = []
         self._backoff = {}                   # {continuation: (failures, when it is asked again)}, in this process
         self._stopped = []                   # the windows stopped, (bucket, minutes, reset_at): once each per reset
+        self._unsure = {}                    # {continuation: said}, its carried start perhaps not received (B4)
 
     # ---------------------------------------------------------------- reading Codex
     def _codex_home(self):
@@ -267,14 +268,15 @@ class UsageStop(UsagePause):
             found = self._message_instead(row, rows, now)
             if found is None:
                 continue                                                # not known now: nothing sent, asked next look
-            if held and found[0] != CARRY:
+            unsure = row["record_id"] in self._unsure
+            if held and found[0] != CARRY and not unsure:
                 continue                                                # its own continuation held with the window
             # v0.6.26 (audit4 B1): a person's reset message is never held by the pause (`holds`: never a person's
             # message), and reset_message leaves one due here to this turn (resetmessage.carried_by_stop). Held with
             # the other window, it expired unsent a day after it fell due and the continuation went in its place at the
             # weekly reset. So once this continuation's own window has reset, its turn carries the message whatever
             # another window holds; the continuation itself still waits for every window.
-            if found[0] == INSTEAD:
+            if found[0] == INSTEAD and not unsure:
                 handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)          # the person's message went (R2)
                 self._count(MESSAGE_INSTEAD)
                 continue
@@ -295,6 +297,19 @@ class UsageStop(UsagePause):
                 continue
             if latest is None or latest.ordinal != row["ordinal"]:
                 handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)          # newer work came (A17)
+                if unsure:
+                    self._unsure.pop(row["record_id"], None)
+                    self._count(MESSAGE_INSTEAD)                                     # the carried turn did start
+                continue
+            if unsure:
+                # audit4 B4: the carried start was written with no answer, or the pipe failed under it, and after one
+                # backoff no turn of it is there. Its words are gone - it may yet arrive, and is never sent twice - so the
+                # person is asked to press Resume, as for a message in the paused queue, and this waits: a chat message
+                # there is still left with Codex, and their Resume ends it as newer work.
+                if not self._unsure[row["record_id"]] and now >= self._backoff.get(row["record_id"], (0, 0))[1]:
+                    self._unsure[row["record_id"]] = True                            # said once
+                    if self._notice("press_resume", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"}):
+                        self._count("resume_unproven")
                 continue
             if latest.status not in FINAL or found[0] == QUEUED:
                 continue
@@ -329,9 +344,11 @@ class UsageStop(UsagePause):
         them - so the message reaches Codex once and the turn lets the paused queue go (MIPC: start_turn is the measured
         route, and the only one). The message's launch is written inside core's guard just before the one request
         (state/resets.carry_message): a restart then finds it sent and never sends it again, and a Cancel is refused.
-        Started, or written with no answer in time (it may have started): the message is sent, watched by core until its
-        marker is in Codex's history, and the continuation ends superseded. The app answering no: the message waits
-        again with its words, and the start is asked again after the backoff."""
+        Started: the message is sent, watched by core until its marker is in Codex's history, and the continuation ends
+        superseded. Written with no answer in time, or the pipe failing under it (it may have started): the message is
+        sent all the same - never twice - but the continuation waits one backoff for the turn to show, and where none does
+        the person is asked to press Resume (audit4 B4). The app answering no: the message waits again with its words,
+        and the start is asked again after the backoff."""
         handle, resets, thread = self._scoped.continuations, self._scoped.resets, row["thread_id"]
         launched = []
 
@@ -355,6 +372,14 @@ class UsageStop(UsagePause):
                 resets.carried_message(rule["rule_id"], True)
             except Exception:
                 pass                                       # launched: a restart takes it as sent (resetmessage.records)
+            if word != ipc.Start.STARTED:
+                # audit4 B4: written with no answer in time, or the pipe failed under the write - it may have started,
+                # so its words go and it is never sent again, but nothing proves it went. The continuation waits one
+                # backoff: a newer turn then ends it; none, and the person is asked to press Resume (`after_reset`).
+                self._unsure[row["record_id"]] = False
+                self._backoff[row["record_id"]] = (failures + 1,
+                                                   now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))
+                return
             self._backoff.pop(row["record_id"], None)
             handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)
             self._count(MESSAGE_INSTEAD)
