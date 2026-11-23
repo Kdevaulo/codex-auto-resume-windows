@@ -1,5 +1,92 @@
 # Changelog
 
+## v0.6.26-beta.2 — Codex's other programs told apart from the app, a version list that gives the window back, and the forced stop's reset message settled
+
+> **The fourth round's fixes.** This beta puts into both editions what the fourth round of audits and its reviews found, so that the live check before the final runs on a published build.
+
+**Kind:** Bug fixes · Feature changes · Performance · Languages · Under the hood
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.26-beta...v0.6.26-beta.2)
+
+**A pre-release: the second of v0.6.26.** It is a GitHub pre-release, so `releases/latest` stays v0.6.25. An installation is offered it
+by *Check for updates* where pre-releases are offered - the check asks first and says it is tested less - and *Install another
+version...* lists it, in the edition you pick. It is a beta because it carries things you can notice: the Codex app no longer read as
+running while it is closed, *Install another version...* giving the window back when closed early, and, in the advanced edition, a reset
+message in a conversation the forced stop paused that now waits for every limit the stop holds. Both editions change in the first group;
+the second is the advanced edition's alone.
+
+**Going back.** Nothing that an earlier version reads changes shape: `selfcheck.json` keeps its form, only the count it holds is now the
+code's own. In the advanced edition, a forced stop kept with Continue after the reset off is a hold with no words, so no earlier
+version you go back to starts the continuation you turned off; and a carried start the app may not have received gives up the
+continuation's words with its doubt, so v0.6.25 and v0.6.26-beta start nothing beside the message.
+
+### Both editions
+
+- **A program of the Codex package started from outside the app is no longer taken for the app.** With the app closed, the package's
+  Chrome extension host was read as the app's main process, so the watcher thought the app was running and could see a second main. Now
+  only a process in the package's app folder or its own folder can be a main; the package's other programs count as the app's only
+  under a main. The package's small update program `app\Codex.exe` is never taken for an engine either: it is never paired, counted as
+  served or run with `--version`.
+- **"Codex changed; recovery cannot work here" is said only when it is true.** One old "starting" look, judged again every tick, or a new
+  "starting" look hours after an old one, no longer turns into a layout this version has not been tested on, and the count still fires
+  at any tick length. A usage answer in which every part names both windows empty is "usage unknown", not Codex changing. Where the app's version cannot
+  be read, the "layout not tested on" notice names the engine's version instead of failing to reach the surfaces.
+- **No content of `codex-layout.json` or `selfcheck.json` can end the watcher.** Both are read fail-closed, with their size, depth and types
+  checked; before, a count written as text or a deeply nested file ended the watcher at each start.
+- **The self-check's unknown error code shows how many failures of that code came in the last day**, not how many of any unknown code.
+- **Closing *Install another version...* before its list comes gives the Dashboard back at once**, and the late answer acts on nothing;
+  before, the window stayed busy for up to 430 seconds after the dialog had gone.
+- **Each page of the version list now gets 60 seconds**, the owner's choice, and the whole list stays within its 400-second budget, which
+  alone ends the run. A list of releases that is too large or built to stall - a page with more entries than asked for, a release naming
+  more than the 1,000 files GitHub allows, entries that take longer to read than the page's time - lists nothing and says the versions
+  are unavailable, instead of holding the window for many minutes. SECURITY says 60 seconds in both languages.
+- **A dialog opens over a maximised window without building a picture of the whole window.** The veil over the owner is one shade at
+  Windows' own transparency wherever no pixel is part-covered, so a maximised 4K Dashboard no longer spends about 44 ms and 61 MB on
+  every dialog's opening; a rounded edge keeps its smooth picture, and the veil still fades with the dialog.
+- **A short movement of the version pill comes to rest under battery saver**, and a leftover fraction of a pixel no longer keeps it
+  playing.
+- **The pictures are pinned to Windows' defaults.** The tray popup's, the notification card's and the tip's pictures are set in each
+  language's own Windows face, whatever face the machine making them has; the window and setup pictures never take High Contrast or the
+  message font's size from that machine; and the popup motion finds the pointer over a button while the popup is still rising.
+- **Translation fixes in seven languages:** Arabic, French, Hebrew, Polish, Russian, Turkish and Ukrainian lines now say what the English
+  says - among them the line that recovery cannot work here, the untested-layout lines, a refused usage read and the product's Settings.
+- **The documents say what the code does.** The guide explains "Codex changed; recovery cannot work here" and what cures it; the privacy
+  page names the layout file, the self-check file and the settings copies Restore defaults sets aside; the editions page says the person's
+  MCP servers may run for the window start where the Codex home's `config.toml` cannot be read; the standards B9, B13, B15, B16, C3, C5
+  and E5 say what the code does and name the tests that pin them (amended by the owner on 2026-11-23), the code unchanged.
+- **Under the hood.** The release notes builder refuses a body over 100,000 characters, so the release stops before anything is
+  published. The privacy guards read every shipped tree and know a host in any case, under any ending, and a bare IP address. The layout
+  audits now lay out the "Codex changed" words in the header, the Pending rows and Diagnostics; nothing was cut off.
+
+### Advanced edition
+
+- **A stopped conversation's reset message waits until every limit the forced stop holds has reset, and then the stop's own turn carries
+  it once** (the owner's answers of 2026-11-23). A message written for either window is held for that turn, never queued into the queue
+  the stop paused and never sent into a window still over its stop percentage; it does not expire while it waits, and its day counts
+  from when the stop lets it go.
+- **With Continue after the reset off, the stop's turn still carries such a message**, and starts only for it; without a message nothing
+  goes, as before. If Continue after the reset is turned off after the stop, the person is asked at the reset to press Resume.
+- **A Resume before the reset ends the stop's hold at the next look**, and the message then goes by the reset message's usual route at
+  its own reset. A held message in a conversation archived at the reset waits a day for it to come back: if it does, the stop's turn carries
+  it; otherwise it ends as one that waited too long, which the page shows as "not sent: it waited too long".
+- **A carried start the app may not have received waits one backoff for its turn**, and without one the person is asked once to press
+  Resume; the message is never sent twice. The doubt is kept in the state, so a watcher restarted inside the backoff still asks.
+- **The stop marks the windows its tick's reading shows over before a turn may start after the reset**, so the stop's turn no longer
+  starts into the other window on the reading from before the reset.
+- **The reset message's statement says all this in all 22 languages**: the stop's turn carries the message, it waits for every held
+  limit, it goes with Continue after the reset off, it still needs the conversation open in the app but not the other checks or the twenty
+  a day, and a Resume returns it to the usual route. The statement's revision is kept, so no one is asked to read it again.
+- **The resident courier keeps its roles while the advanced state is busy**, and a run of failed reads ends it after ten minutes by the
+  clock. An e-mail notice's one time limit now holds the connection STARTTLS makes and the closing QUIT, and a streamed download's time limit
+  covers the connection, the handshake and the headers from the start of the call.
+- **Account switching no longer waits on the Codex package's update program** (or on a main an update renamed `Codex.exe`), which it
+  counted as another engine on the Codex home.
+- **Start right after a reset no longer wakes the PC every five minutes.** Only a held occasion's own time is given to Windows - the look
+  past a full weekly reset and the minute a daily ceiling lets a start go again - not each retry of a passing failure.
+- **The Hungarian lines on the window start's risks address the reader in one form throughout.**
+- **The fifth check swept the forced stop, the reset message and the continuation together**: 403 cases run on the real engine with
+  fakes at the clock, the app and the usage reads; every red case was one of the findings fixed above.
+
 ## v0.6.26-beta — A watcher that says when Codex changed and recovery cannot work here, the reset message carried by the forced stop's own turn, release lists of up to twenty pages, and moving pictures that move as the product does
 
 > **The third round's fixes.** This beta puts into both editions what the third round of audits found, and what a review of those fixes found in turn, with a watcher that survives Codex's updates and moving pictures that follow the product.
@@ -15,8 +102,8 @@ changed, the lists and bounds of *Install another version...*, the window's wait
 edition, a paused queue that is let go at the reset. Both editions change in the first group; the second is the advanced edition's alone.
 
 **Going back.** Nothing that an earlier version reads changes: the watcher's state, the settings file and the advanced edition's own file
-keep the versions they had. The watcher now also keeps one small file of its own beside them, `codex-layout.json` in its state folder -
-the last Codex layout it looked at - which an earlier version ignores.
+keep the versions they had. The watcher now also keeps two small files of its own beside them in its state folder, `codex-layout.json` -
+the last Codex layout it looked at - and `selfcheck.json` - its judgement of its own looks - which an earlier version ignores.
 
 ### Both editions
 
@@ -44,8 +131,6 @@ the last Codex layout it looked at - which an earlier version ignores.
   word names what it found instead of "Nothing else to do.". A usage read that broke, an error code Codex reported that this version
   does not know and a named engine the app does not run are each said. A Codex refusing a usage read - a signed-out account - no longer
   fails a protocol check; only a Codex that says it does not know the method does.
-- **A record that left Codex's queue is unproven an hour after the watcher's start, however often the watcher starts.** On a PC that is
-  shut down each night the day the record was given never ended, and the conversation's later records could not be claimed.
 - **Restore defaults never deletes the copy it has just set aside, whatever the clock says**, and keeps the newest five set-aside settings
   files and deletes the older ones. A settings string holding a lone surrogate is refused as a settings error, and an old file holding
   one no longer fails every save.
@@ -110,6 +195,9 @@ the last Codex layout it looked at - which an earlier version ignores.
   every other queued message with its words. It is now found by its proof where no queue id is known, never sent again, and its day counts
   from when it was last seen there. A chat message in a queue the forced stop paused is left with Codex, never taken back with its words
   gone.
+- **A queued prompt, reset message or chat message that left Codex's queue is unproven an hour after the watcher's start, however often
+  the watcher starts.** On a PC that is shut down each night the day the message was given never ended, and the conversation's later
+  messages could not be claimed.
 - **Codex refusing a usage read turns nothing off for good.** One signed-out read used to turn every capability standing on the usage
   read off and store it off, and a later good read did not turn it back on. Where a Codex home loses its lock folder, the five
   capabilities that route by whether the app holds the conversation get that grade instead, and the page says so.
@@ -119,7 +207,8 @@ the last Codex layout it looked at - which an earlier version ignores.
 - **Start right after a reset keeps a full weekly window's occasion a window past its reset, wakes the PC for it and reads a
   `config.toml` with a byte-order mark.** A PC asleep through the old ten minutes ended the occasion unread and the chain with it. The
   statements say which of the person's programs may run - the request switches off their MCP servers, hooks, plugins, apps and notify
-  program, and is sent once more without that where Codex refuses it - and the guide gives the request as it is.
+  program, and is sent once more without that where Codex refuses it, and where the Codex home's `config.toml` cannot be read here its
+  MCP servers may run - and the guide gives the request as it is.
 - **Account switching settles a switch whose account was read only at a later look as fully as one seen made at once**, and never takes a
   terminal's engine for the app's because the app was given its dead shell's id.
 - **The Python choice is tidier and bounded.** A runtime left whole when the choice was turned off goes at the next start, and no sweep

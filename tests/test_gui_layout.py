@@ -531,9 +531,28 @@ def overview_states(now: float) -> list:
             ["a watcher the memory guard stopped", guarded],
             ["a watcher that stopped unexpectedly", unexpected],
             ["a watcher in an unknown state", watcher(True, None, True, "structurally_compatible", None)],
+            # v0.6.26 (fourth-round design lead): the watcher's own judge saying recovery cannot work here - Right now's
+            # overlay.codex_changed, the longest of its words in most languages (de 76 characters).
+            ["Codex changed, recovery cannot work here", codex_changed(fullest)],
             ["nothing waiting, History unreadable", idle],
             ["Pending unreadable", unreadable],
             ["a first installation", first_installation(now)]]
+
+
+def codex_changed(reply: dict) -> dict:
+    """`reply` with the watcher's own judge (domain/public.py self_check) saying the most it says: recovery cannot work
+    here, an error code this version does not know seen a million times less one, Codex in an untested layout and an
+    update after which no server was matched - the versions at the longest it names one (VERSION_MAX) - and every waiting
+    record held for it (the codex_changed overlay). SettingsForm.WithCodexChanged gives LayoutAudit the same."""
+    changed = copy.deepcopy(reply)
+    changed["status"]["watcher"]["self_check"] = {
+        "blocked": "recovery_blocked:held_elsewhere",
+        "unknown_error": {"code": "responseStreamConnectionFailedOnRetry", "count": 999999},
+        "layout_untested": "0.167.0-alpha.123456789.98765432", "updated_from": "0.6.26-beta.12345678901234567890"}
+    for row in changed.get("pending") or []:
+        if "codex_changed" not in row["overlays"]:
+            row["overlays"] = list(row["overlays"]) + ["codex_changed"]
+    return changed
 
 
 def first_installation(now: float) -> dict:

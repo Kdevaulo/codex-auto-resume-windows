@@ -903,16 +903,19 @@ class BreathingPictureTests(unittest.TestCase):
                 renderer = tray_popup.Renderer()
                 renderer.theme, renderer.design = g.THEME, "soft"
                 renderer.lone = True
+                # v0.6.26 (audit4 F1): drawn in the face the picture is made in (`pinned_face`), not this machine's
+                # UI font - on a Korean Windows the popup's own fonts would otherwise be Malgun Gothic's Latin.
                 try:
-                    plan = renderer.layout(view, g.POPUP_SCALE, tray_popup.locale_of(strings))
-                    pad = tray_popup.layers.still_pad(g.POPUP_SCALE)
-                    self.assertEqual(len(pictures), timeline.steps)
-                    for step in (0, 1, 33, 66, 99, timeline.steps - 1):
-                        moment = timeline.moments[step]
-                        renderer.draw(view, plan, frame=tray_popup.halo(view["light"], moment, moment))
-                        whole = g.popup_picture(renderer, plan, pad, g.THEME, "soft")[2]
-                        with self.subTest(step=step):
-                            self.assertEqual(pictures[step], g.clear_rgba(whole))
+                    with g.pinned_face():
+                        plan = renderer.layout(view, g.POPUP_SCALE, tray_popup.locale_of(strings))
+                        pad = tray_popup.layers.still_pad(g.POPUP_SCALE)
+                        self.assertEqual(len(pictures), timeline.steps)
+                        for step in (0, 1, 33, 66, 99, timeline.steps - 1):
+                            moment = timeline.moments[step]
+                            renderer.draw(view, plan, frame=tray_popup.halo(view["light"], moment, moment))
+                            whole = g.popup_picture(renderer, plan, pad, g.THEME, "soft")[2]
+                            with self.subTest(step=step):
+                                self.assertEqual(pictures[step], g.clear_rgba(whole))
                 finally:
                     renderer.close()
         self.assertEqual(record["lights"][0]["state"], view["light"])

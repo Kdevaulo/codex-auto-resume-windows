@@ -118,7 +118,8 @@ class CardPlanTests(unittest.TestCase):
                 self.assertNotIn("window", plan)
                 self.assertIn("taskbar", plan, "the card stands on the right end of a taskbar (tests/test_motion_card_strip.py)")
                 self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]),
-                                 ([776, {"card-en": 608, "card-ko": 592}[name]], 2.0))
+                                 # card-en 578 since v0.6.26-beta.2: its card is set in Segoe UI (audit4 F1), 30 px shorter.
+                                 ([776, {"card-en": 578, "card-ko": 592}[name]], 2.0))
                 self.assertLessEqual(plan["budget"]["cap"], 4000000)
                 frames = motion_plan.expand(plan)
                 from codex_auto_resume import notice_card

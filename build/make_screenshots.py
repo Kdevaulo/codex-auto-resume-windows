@@ -1136,6 +1136,15 @@ def read_png(path: Path) -> tuple:
     return width, height, bytes(out), (bytes(clear) if channels == 4 and min(clear) < 255 else None)
 
 
+def pinned_face():
+    """Inside it, the popup's, the card's and the tip's fonts take Segoe UI as Windows' UI font - an English Windows'
+    answer - instead of this machine's, and each language then its own Windows face (ui/popup/fonts.py
+    `windows_ui_face`, v0.6.26 audit4 F1): the panel's picture pins the same face (`panel_html`), the window's its
+    RenderFont. Made on a Korean Windows, an English popup was otherwise set in Malgun Gothic's Latin."""
+    from codex_auto_resume.ui.popup import fonts
+    return fonts.windows_ui_face(typeface.SEGOE)
+
+
 def render_popup(target: Path, locale: str, *, theme: str | None = None, design: str | None = None,
                  scale: float = POPUP_SCALE, moving: bool = True) -> dict:
     """The popup in THEME at POPUP_SCALE, in `design`; returns the picture's record (`picture_record`).
@@ -1157,33 +1166,34 @@ def render_popup(target: Path, locale: str, *, theme: str | None = None, design:
     # (`card_still`), as the notification card's pictures are: RGBA, nothing but the card and its shadow opaque.
     renderer.lone = True
     try:
-        plan = renderer.layout(view, scale, tray_popup.locale_of(strings))
-        pad = tray_popup.layers.still_pad(scale)
-        card = plan["card"]
-        record = picture_record("popup", theme, design,
-                                popup_lights(plan, theme, design, (pad - card[0], pad - card[1])))
+        with pinned_face():
+            plan = renderer.layout(view, scale, tray_popup.locale_of(strings))
+            pad = tray_popup.layers.still_pad(scale)
+            card = plan["card"]
+            record = picture_record("popup", theme, design,
+                                    popup_lights(plan, theme, design, (pad - card[0], pad - card[1])))
 
-        def at(moment):
-            return tray_popup.halo(view["light"], moment, moment, design=design)
+            def at(moment):
+                return tray_popup.halo(view["light"], moment, moment, design=design)
 
-        def picture():
-            return popup_picture(renderer, plan, pad, theme, design)
+            def picture():
+                return popup_picture(renderer, plan, pad, theme, design)
 
-        renderer.draw(view, plan, frame=at(0))
-        width, height, first = picture()
-        timeline = light_timeline(record) if moving else None
-        if timeline is None:
-            write_png(target, width, height, first, clear=True)
+            renderer.draw(view, plan, frame=at(0))
+            width, height, first = picture()
+            timeline = light_timeline(record) if moving else None
+            if timeline is None:
+                write_png(target, width, height, first, clear=True)
+                return record
+            rgb, alpha = unpremultiply(first)
+
+            def frames():
+                yield timeline.delay, rgb
+                for moment in timeline.moments[1:]:
+                    renderer.draw_halo(plan, at(moment))
+                    yield timeline.delay, unpremultiply(picture()[2])[0]
+            write_apng(target, width, height, frames(), alpha)       # only the light moves: the ground stays clear
             return record
-        rgb, alpha = unpremultiply(first)
-
-        def frames():
-            yield timeline.delay, rgb
-            for moment in timeline.moments[1:]:
-                renderer.draw_halo(plan, at(moment))
-                yield timeline.delay, unpremultiply(picture()[2])[0]
-        write_apng(target, width, height, frames(), alpha)       # only the light moves: the ground stays clear
-        return record
     finally:
         renderer.close()
 
@@ -1697,9 +1707,10 @@ class _SettledCard:
         tray_popup._gdiplus_acquire()
         self.card = None
         try:
-            self.card = card = notice_window.Card(_NoStack(), card_notice(locale), now_ms=0, where=where,
-                                                  drawn=drawn, windows=False)
-            frame = card.paint(notice_card.ENTRANCE_MS)["frame"]     # at rest: whole, full depth
+            with pinned_face():                                       # its words in Segoe UI's stack (F1)
+                self.card = card = notice_window.Card(_NoStack(), card_notice(locale), now_ms=0, where=where,
+                                                      drawn=drawn, windows=False)
+                frame = card.paint(notice_card.ENTRANCE_MS)["frame"]     # at rest: whole, full depth
             if frame != notice_card.SETTLED:
                 raise RuntimeError("the card is not at rest: %r" % (frame,))
             (width, height), margin = card.size, card.margin
@@ -1731,7 +1742,8 @@ class _SettledCard:
         if not moment:
             return self._first
         card = self.card
-        card._draw_light(card.born + moment)
+        with pinned_face():
+            card._draw_light(card.born + moment)
         top, bottom = card.renderer.halo_rows
         row = self.card_width * 4
         band = bytes(card.image._pixels[top * row:bottom * row])

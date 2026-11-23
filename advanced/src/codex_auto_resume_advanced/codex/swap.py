@@ -38,7 +38,6 @@ shape, given `between`) and `read_real` (the account read on the real home). A t
 """
 from __future__ import annotations
 
-from pathlib import Path
 import time
 
 from . import authfile
@@ -221,7 +220,9 @@ def other_engines(rows, *, app_open) -> bool:
     for row in rows:
         if not isinstance(row, dict) or not isinstance(row.get("path"), str):
             return True
-        if Path(row["path"]).name.lower() != "codex.exe" or row.get("pid") in own:
+        # review-core C2: core's rule of what an engine is (pairing.engine_row, the fourth round's A3) - a codex.exe where
+        # the app's main is (its update trampoline, or a main an update renamed Codex.exe, K7) is never one.
+        if not pairing.engine_row(row) or row.get("pid") in own:
             continue
         if main is not None and row.get("pid") != main and under_main(row):
             continue

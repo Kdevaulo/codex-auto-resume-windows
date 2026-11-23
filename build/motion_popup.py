@@ -91,7 +91,8 @@ class PopupFrames:
             for row in key[1]:
                 model.begin(model.action_for(("check", tasks[row - 1])))
                 vm = model.view(now)
-            self._views[key] = (vm, self.renderer.layout(vm, self.scale, self.locale), tasks)
+            with shots.pinned_face():           # the stills' face (make_screenshots.pinned_face, F1)
+                self._views[key] = (vm, self.renderer.layout(vm, self.scale, self.locale), tasks)
         vm, plan, _tasks = self._views[key]
         return vm, plan
 
@@ -184,16 +185,20 @@ class PopupFrames:
                 gliding[("check", tasks[row - 1])] = amount
         moment = frame.t if light_at is None else light_at
         light = self.tray.halo(vm["light"], moment, moment, design=self.design)
-        hover = self.hovered(pointer, self.opening(frame)[1])
+        # `pointer` is in this picture's own pixels, and the picture is laid `below` its place while it rises
+        # (make_motion.make, its popup layer): the rise is already out of it, as the product hit-tests in the risen window's
+        # own coordinates. Taken out again, a pointer at a button's top was missed for the opening's 160 ms (audit4 F3).
+        hover = self.hovered(pointer)
         faces = self.faces(plan, hover, frame.t)
-        if gliding or hover is not None or faces:
-            self.renderer.draw(vm, plan, frame=light, glides=gliding, hover=hover, faces=faces)
-            self._held = None
-        elif self._held == key:
-            self.renderer.draw_halo(plan, light)
-        else:
-            self.renderer.draw(vm, plan, frame=light)
-            self._held = key
+        with self.shots.pinned_face():
+            if gliding or hover is not None or faces:
+                self.renderer.draw(vm, plan, frame=light, glides=gliding, hover=hover, faces=faces)
+                self._held = None
+            elif self._held == key:
+                self.renderer.draw_halo(plan, light)
+            else:
+                self.renderer.draw(vm, plan, frame=light)
+                self._held = key
         _w, _h, bgra = self.shots.popup_picture(self.renderer, plan, self.pad, self.theme, self.design)
         return self.shots.clear_rgba(bgra)
 

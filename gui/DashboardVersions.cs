@@ -51,6 +51,8 @@ namespace CodexAutoResume
         private bool pickDeletesAccounts;
         // Which listing is the latest, so the answer to one whose dialog was closed is dropped.
         private int versionsToken;
+        // The window's busy state the listing holds (SetBusy), ended once: by its answer, or by the dialog closing first.
+        private bool versionsWaiting;
 
         // ------------------------------------------------------------------ the button
         /// The button's one handler: the dialog built, its listing started, the dialog shown; then, for a row a person
@@ -79,6 +81,10 @@ namespace CodexAutoResume
                     listed = versionsListed;
                 }
             }
+            // v0.6.26 (fourth-round audit C2): closed before its list came, the window is free again at once, not after
+            // the listing's 430 seconds; the listing, which only reads, runs on, and its answer is dropped (the token).
+            versionsToken++;
+            EndVersionsWait();
             versionsPicked = null;
             if (picked == null || listed == null || picked[2] != "offered") return;
             if (!ConfirmPick(picked, listed)) return;
@@ -168,6 +174,7 @@ namespace CodexAutoResume
         {
             int mine = ++versionsToken;
             SetBusy(true);
+            versionsWaiting = true;
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
                 string printed, errors;
@@ -177,19 +184,29 @@ namespace CodexAutoResume
                 string releases = ran == "done" ? ReleasesLine(printed) : null;
                 List<string[]> rows = new List<string[]>();
                 string[] listed = null;
-                // Still asking after three minutes is an answer that did not come; nothing the bootstrap did not print
-                // is ever read as a list.
+                // Still asking after 430 seconds (ListMilliseconds) is an answer that did not come; nothing the bootstrap
+                // did not print is ever read as a list.
                 string state = ran == "done" ? VersionsLines(printed, code, out rows, out listed)
                              : ran == "running" ? "unavailable" : "unreadable";
                 MethodInvoker apply = delegate
                 {
-                    SetBusy(false);
+                    // An answer to a listing whose dialog has closed acts on nothing: the close ended its wait already,
+                    // and a later listing's wait is that listing's.
                     if (mine != versionsToken || dialog.IsDisposed) return;
+                    EndVersionsWait();
                     ShowVersionRows(state, rows, listed, releases);
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(apply); }
                 catch (Exception) { }
             });
+        }
+
+        /// The listing's hold on the window ended, once, whichever comes first: its answer or its dialog closing.
+        private void EndVersionsWait()
+        {
+            if (!versionsWaiting) return;
+            versionsWaiting = false;
+            SetBusy(false);
         }
 
         /// One answer of the listing in the dialog BuildVersions made: `state` as VersionsLines read it, its rows and

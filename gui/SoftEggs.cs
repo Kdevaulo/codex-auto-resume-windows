@@ -679,11 +679,22 @@ namespace CodexAutoResume
 
         private void Set(double up, double level)
         {
-            if (Math.Abs(up - lift) < 0.01 && Math.Abs(level - ring) < 0.01) return;
+            if (!Changes(up, lift, level, ring)) return;
             bool moved = RiseOf(up) != RiseOf(lift);
-            lift = up;
+            // At rest exactly: under a thousandth of a pixel is where it is placed and drawn anyway (RiseOf, OffsetOf).
+            lift = up <= 0.001 ? 0.0 : up;
             ring = level;
             if (Changed != null) Changed(moved);
+        }
+
+        /// Whether a pill `lift` up with its ring at `ring` is set to `up` and `level`: a change of a hundredth of a pixel or of
+        /// the ring's strength or more, and always the pill's coming to rest (v0.6.26, fourth-round audit C1): the nudge's
+        /// eased tail often lands a thousandth to a hundredth of a pixel up the frame before rest, and that lift, kept,
+        /// left the pill settling under battery saver - the 33 ms beat and the clock running on, whole nudges more played.
+        internal static bool Changes(double up, double lift, double level, double ring)
+        {
+            if (up <= 0.001 && lift != 0) return true;
+            return Math.Abs(up - lift) >= 0.01 || Math.Abs(level - ring) >= 0.01;
         }
 
         /// Its ring, drawn just inside the pill's edge (`bounds`, its body, `radius` its corners) in the day's colour.

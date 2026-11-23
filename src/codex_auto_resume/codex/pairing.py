@@ -223,6 +223,15 @@ def _main_slot(path) -> bool:
     return bool(pattern.fullmatch(path))
 
 
+def engine_row(row) -> bool:
+    """Whether the inventory row `row` may be a Codex engine: a process of a file called codex.exe, whatever its case,
+    but not where the app's main is (`_main_slot`). v0.6.26 (fourth round A3): the package's `app\\Codex.exe` is its
+    update trampoline (an OpenAI-signed program of 20 KB, not an engine) or a main an update renamed (review K7) - never
+    paired as a server, counted among the engines the app serves, or run with --version as a candidate engine."""
+    return (isinstance(row, dict) and isinstance(row.get("path"), str)
+            and PureWindowsPath(row["path"]).name.lower() == "codex.exe" and not _main_slot(row["path"]))
+
+
 def app_process(row) -> bool:
     """Whether the inventory row `row` is a process of the Codex app's own package - a main or a helper: a ChatGPT.exe
     of the package (`_package_app`), as always, or (v0.6.26, update resilience #5) any other file of the package's
@@ -269,15 +278,34 @@ def _started(parent, child, *, to_main) -> bool:
     return up is not None and down is not None and up <= down
 
 
+def _main_place(path) -> bool:
+    """Whether `path` is where the app's main can be (v0.6.26, fourth round A1): directly in the package's `app` folder
+    (`_main_slot`: its ChatGPT.exe, or a main an update renamed) or directly in the package's own folder (a renamed
+    main moved up). The package's other programs sit in folders below `app` - its engine and tools in resources, the
+    Chrome native host in plugins, node in cua_node - and are never a main."""
+    if _main_slot(path):
+        return True
+    pattern = re.compile(re.escape(str(_windows_apps())) + r"\\OpenAI\.Codex_[^\\]+__" + CODEX_APP_PUBLISHER +
+                         r"\\[^\\]+", re.I)
+    return _package_file(path) and bool(pattern.fullmatch(path))
+
+
 def app_mains(rows) -> list:
-    """Every row that may be the Windows Store app main: a process of the app's package (`app_process`) whose parent
-    is none of the package's own processes - or (v0.6.26) whose listed package parent was created after it, so its own
-    parent is gone. Pure; `_app_main` takes exactly one."""
+    """Every row that may be the Windows Store app main: a process of the app's package (`app_process`) where a main
+    can be (`_main_place`) whose parent is none of the package's own processes - or (v0.6.26) whose listed package
+    parent was created after it, so its own parent is gone. Pure; `_app_main` takes exactly one.
+
+    v0.6.26 (fourth round A1): a package program of another folder is the app's only under a main (`under_app`), never
+    a main itself. Measured 2026-11-23 with the app closed: the package's Chrome native host (an app execution alias,
+    `...\\extension-host.exe`, of the package's family, started by cmd.exe for Chrome) was the inventory's one row and
+    was read as the main - the app read as running when it was closed, and as two mains, every recovery waiting, when
+    it was open."""
     apps = [row for row in rows if app_process(row)]
     by_pid = {}
     for row in apps:
         by_pid.setdefault(row["pid"], []).append(row)
-    return [row for row in apps if not any(_started(up, row, to_main=True) for up in by_pid.get(row.get("parent"), ()))]
+    return [row for row in apps if _main_place(row["path"])
+            and not any(_started(up, row, to_main=True) for up in by_pid.get(row.get("parent"), ()))]
 
 
 def _app_main(rows):
@@ -338,9 +366,7 @@ def server_engines(rows) -> frozenset:
     Codex desktop 26.1117 runs its app server under the package's utility process.
     """
     main = _app_main(rows)
-    return frozenset(row["path"] for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-                     and under_app(rows, row, main["pid"])
-                     and PureWindowsPath(row["path"]).name.lower() == "codex.exe")
+    return frozenset(row["path"] for row in rows if engine_row(row) and under_app(rows, row, main["pid"]))
 
 
 def app_engines() -> frozenset:
@@ -381,8 +407,11 @@ def app_running(rows) -> bool:
     except AdapterError as error:
         if str(error) != "desktop_main_missing_or_ambiguous":
             return True
-    root = str(_windows_apps()).lower() + "\\openai.codex_"
+    # v0.6.26 (fourth round A1): of the package's programs, its ChatGPT.exe and codex.exe, which v0.6.25 listed, and a
+    # main an update renamed - never another program of its folders on its own (the Chrome native host Chrome keeps).
+    root, names = str(_windows_apps()).lower() + "\\openai.codex_", {name.lower() for name in INVENTORY_NAMES}
     return any(isinstance(row, dict) and isinstance(row.get("path"), str) and row["path"].lower().startswith(root)
+               and (PureWindowsPath(row["path"]).name.lower() in names or (app_process(row) and _main_place(row["path"])))
                for row in rows)
 
 
@@ -447,8 +476,7 @@ def session_kind(rows, user, codex_exe) -> bool:
     is no. Paths are compared, never kept (D2)."""
     if not isinstance(user, dict) or not isinstance(rows, list):
         return False
-    found = [row for row in rows if isinstance(row, dict) and row.get("pid") == user.get("pid")
-             and isinstance(row.get("path"), str) and PureWindowsPath(row["path"]).name.lower() == "codex.exe"]
+    found = [row for row in rows if engine_row(row) and row.get("pid") == user.get("pid")]
     if len(found) != 1 or found[0].get("parent") == os.getpid():
         return False
     row = found[0]
@@ -487,8 +515,7 @@ def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False, seen=No
     `session_kind`'s caller asks before it calls a conversation another session's (codex/transport.py).
     """
     main = _app_main(rows)
-    engines = [row for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-               and PureWindowsPath(row["path"]).name.lower() == "codex.exe" and under_app(rows, row, main["pid"])]
+    engines = [row for row in rows if engine_row(row) and under_app(rows, row, main["pid"])]
     servers = [row for row in engines if row["path"].lower() == str(codex_exe).lower()]
     others = [row for row in engines if row["path"].lower() != str(codex_exe).lower()]
     holder = None
@@ -498,8 +525,7 @@ def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False, seen=No
     elif len(servers) == 1 and codex_home is not None:
         holders = _database_holders(codex_home)
         held = _held(servers, holders)
-        codex_pids = {row.get("pid") for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-                      and PureWindowsPath(row["path"]).name.lower() == "codex.exe"}
+        codex_pids = {row.get("pid") for row in rows if engine_row(row)}
         if _held(others, holders) or (not held and any(each.get("pid") in codex_pids for each in holders)):
             raise AdapterError("desktop_server_missing_or_ambiguous")
         holder = held[0][1] if held else None

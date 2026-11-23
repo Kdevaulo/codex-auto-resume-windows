@@ -1577,8 +1577,9 @@ five output tokens - under 1% of the 5-hour window when measured - and the weekl
 started early also ends early: if you begin late in it, less of it is left. Codex may change how an idle window
 reports itself; then nothing is started, and the journal says why. Since v0.6.24 the request starts none of your own
 programs: no MCP server, hook, plugin, app or `notify` program runs for it. Only where Codex refuses those
-switches is the plain request sent again as it was before v0.6.24, and then your programs do run for it - the
-watcher's log says so.
+switches is the plain request sent again as it was before v0.6.24, and then your programs do run for it; or where
+the Codex home's `config.toml` cannot be read here, when no MCP server can be named off and its MCP servers may run
+for it - the watcher's log says so either way.
 
 **Departs from** [A1 and A2](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (a request beside the one send,
 through `codex exec`), [A13 and A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (nothing failed, and its

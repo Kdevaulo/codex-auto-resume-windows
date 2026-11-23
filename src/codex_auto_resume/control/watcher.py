@@ -190,7 +190,8 @@ def read_self_check(paths, status):
         if not path.is_file() or path.is_symlink() or path.stat().st_size > 4096:
             return None
         return self_check(json.loads(path.read_text(encoding="utf-8")), (status or {}).get("started_at"))
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError, TypeError, RecursionError, MemoryError):
+        # Fourth round (audit-security D1): 4096 bytes of `[` raise RecursionError under Python 3.13.
         return None
 
 

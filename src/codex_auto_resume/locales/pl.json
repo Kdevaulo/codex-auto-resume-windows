@@ -1340,7 +1340,7 @@
   "why.usage_unavailable": "Limit użycia nie jest jeszcze dostępny.",
   "why.usage_unknown": "Nie udało się odczytać wykorzystania limitu, więc zadanie czeka zamiast zgadywać.",
   "why.usage_probe_broken_answer": "Nie udało się odczytać wykorzystania limitu: Codex odpowiedział w sposób, którego ta wersja nie zna, więc zadanie czeka zamiast zgadywać.",
-  "why.usage_probe_broken_request": "Nie udało się odczytać wykorzystania limitu: Codex odrzucił prośbę o wykorzystanie, więc zadanie czeka zamiast zgadywać.",
+  "why.usage_probe_broken_request": "Nie udało się odczytać wykorzystania limitu: Codex odrzucił zapytanie o wykorzystanie limitu, więc zadanie czeka zamiast zgadywać.",
   "why.usage_probe_broken_start": "Nie udało się odczytać wykorzystania limitu: pomocnik wykorzystania Codex nie odpowiedział, więc zadanie czeka zamiast zgadywać.",
   "why.user_input_queued": "W tej rozmowie czeka w kolejce coś Twojego i ma pierwszeństwo.",
   "why.version_newer_than_engine": "Tę rozmowę ostatnio uruchomił nowszy Codex niż ten tutaj; będzie kontynuowana po aktualizacji Codex.",

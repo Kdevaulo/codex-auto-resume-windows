@@ -61,6 +61,14 @@ COURIER_IMPORT = re.compile(r"^\s*from \. import (?:[a-z_]+, )*http\b", re.MULTI
 COURIER_HOSTS = re.compile(r"^https://(?:api\.telegram\.org/bot|status\.openai\.com/api/v2/summary\.json$)"
                            # v0.6.22: the loopback web view's own address, formed where it is served from.
                            r"|^http://%s:%d/$")
+# Read by the URL test since it reads every shipped tree (audit4 D4, E7), and found there on 2026-11-23:
+# - the window's and the setup program's manifests (gui/app.manifest, build/setup/setup.manifest) name the XML namespaces
+#   of Windows' settings by their http:// names. A namespace is a name Windows compares; nothing fetches it.
+MANIFEST_NAMESPACE = re.compile(r"^http://schemas\.microsoft\.com/SMI/20(?:05|16)/WindowsSettings$")
+# - the advanced page's example of the loopback web view (advanced/gui/AdvancedExamples.cs) shows the address the view is
+#   served at, as text in a drawn example: this PC's loopback and a private LAN address. Nothing connects to them.
+EXAMPLE_ADDRESSES_IN = "advanced/gui/AdvancedExamples.cs"
+EXAMPLE_ADDRESSES = re.compile(r"^http://(?:127\.0\.0\.1|192\.168\.0\.2):47615/$")
 # What listens, in any shipped language: a socket's own calls, the standard library's servers, .NET's listeners. Python's
 # `bind` and `listen` are looked for as calls on something, so a word in a sentence is not one.
 LISTENING = re.compile(r"\.listen\(|\.bind\(\(|\bsocket\.socket\(|\b(?:Threading)?HTTPServer\b|\bTCPServer\b|\bUDPServer\b"
@@ -247,15 +255,22 @@ class CodePropertyTests(unittest.TestCase):
                              r"chatgpt\.com/backend-api/|"
                              r"www\.python\.org|agent-plugins\.org|schemas\.microsoft\.com|"
                              r"docs\.microsoft\.com|learn\.microsoft\.com)/?", re.I)
+        # Every tree that ships or is compiled into what ships (audit4 D4, E7): the bare-host test's own set, so the two
+        # read the same files - the window's and the setup program's sources, the skills, .codex-plugin/, .agents/ and
+        # the plugin's .mcp.json among them - and the api.github.com pin below holds over all of them.
+        from test_privacy_bare_hosts import shipped_files
         offenders, api = [], set()
-        for path in tracked("scripts/*") + tracked("build/install/*") + tracked("src/*") + tracked("advanced/src/*"):
+        for path in shipped_files():
             try:
                 text = path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
-            courier = str(path.relative_to(ROOT)).replace("\\", "/").startswith(COURIER)
+            name = str(path.relative_to(ROOT)).replace("\\", "/")
+            courier = name.startswith(COURIER)
             for url in re.findall(r"https?://[^\s\"'`)\]]+", text):
-                if not allowed.match(url) and not (courier and COURIER_HOSTS.match(url)):
+                if (not allowed.match(url) and not (courier and COURIER_HOSTS.match(url))
+                        and not MANIFEST_NAMESPACE.match(url)
+                        and not (name == EXAMPLE_ADDRESSES_IN and EXAMPLE_ADDRESSES.match(url))):
                     offenders.append("%s: %s" % (path.relative_to(ROOT), url))
                 if url.startswith("https://api.github.com"):
                     api.add(url)
@@ -398,7 +413,7 @@ class WordingTests(unittest.TestCase):
                    "v0.4.0", "v0.4.1", "v0.5.0", "v0.5.1", "v0.5.2", "v0.5.3", "v0.5.4", "v0.5.5",
                    "v0.5.6", "v0.5.7", "v0.6.0", "v0.6.1", "v0.6.2", "v0.6.3", "v0.6.4", "v0.6.5",
                    "v0.6.6", "v0.6.7", "v0.6.8", "v0.6.9", "v0.6.10", "v0.6.11", "v0.6.12",
-                   "v0.6.13", "v0.6.14", "v0.6.15", "v0.6.16", "v0.6.17", "v0.6.18", "v0.6.19-beta", "v0.6.19-beta.2", "v0.6.19-beta.3", "v0.6.19-beta.4", "v0.6.19", "v0.6.20-beta", "v0.6.20-beta.2", "v0.6.20-beta.3", "v0.6.20-beta.4", "v0.6.20", "v0.6.21", "v0.6.22-beta", "v0.6.22-beta.2", "v0.6.22", "v0.6.23-beta", "v0.6.23-beta.2", "v0.6.23", "v0.6.24-beta", "v0.6.24-beta.2", "v0.6.24", "v0.6.25")
+                   "v0.6.13", "v0.6.14", "v0.6.15", "v0.6.16", "v0.6.17", "v0.6.18", "v0.6.19-beta", "v0.6.19-beta.2", "v0.6.19-beta.3", "v0.6.19-beta.4", "v0.6.19", "v0.6.20-beta", "v0.6.20-beta.2", "v0.6.20-beta.3", "v0.6.20-beta.4", "v0.6.20", "v0.6.21", "v0.6.22-beta", "v0.6.22-beta.2", "v0.6.22", "v0.6.23-beta", "v0.6.23-beta.2", "v0.6.23", "v0.6.24-beta", "v0.6.24-beta.2", "v0.6.24", "v0.6.25", "v0.6.26-beta")
         text = (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
         missing = [tag for tag in shipped
                    if not re.search(r"^##\s+%s\b" % re.escape(tag), text, re.M)]
