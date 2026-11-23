@@ -92,12 +92,55 @@ def read(path) -> dict | None:
     """What the watcher last kept of the layout (config/codex-layout.json), or None where there is none or it cannot be
     read: {"format", "code_version", "engine_version", "app_version", "layout", "catalogued", "last_good",
     "updated_from", "unpaired_after_update"} - `last_good` the last look that paired, with the version of this product,
-    of the engine and of the app it was made on."""
+    of the engine and of the app it was made on.
+
+    Fourth round (audit-standards E2, audit-security D1): read fail-closed, like the other state files - a file over
+    READ_MOST bytes, nested past what the reader takes or of another shape is None, and only the closed shape is kept
+    (counts that are ints, flags that are bools, words that are printable text), whatever another version or a hand
+    edit put there. A file read here never ends the watcher."""
     try:
-        found = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError, TypeError):
+        with open(path, "rb") as stream:
+            data = stream.read(READ_MOST + 1)
+        if len(data) > READ_MOST:
+            return None
+        found = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError, TypeError, RecursionError, MemoryError):
         return None
-    return found if isinstance(found, dict) and found.get("format") == FORMAT else None
+    if not isinstance(found, dict) or type(found.get("format")) is not int or found["format"] != FORMAT:
+        return None
+    last = found.get("last_good")
+    return {"format": FORMAT, "code_version": _word(found.get("code_version")),
+            "engine_version": _word(found.get("engine_version")), "app_version": _word(found.get("app_version")),
+            "layout": _layout(found.get("layout")), "catalogued": _flag(found.get("catalogued")),
+            "last_good": ({"code_version": _word(last.get("code_version")),
+                           "engine_version": _word(last.get("engine_version")),
+                           "app_version": _word(last.get("app_version")), "layout": _layout(last.get("layout"))}
+                          if isinstance(last, dict) else None),
+            "updated_from": _word(found.get("updated_from")),
+            "unpaired_after_update": _flag(found.get("unpaired_after_update"))}
+
+
+# The most a kept layout file may hold: what this version writes is under 2 KB.
+READ_MOST = 16384
+_COUNTS = ("mains", "helpers", "engines_under_main", "engines_under_helper", "engines_elsewhere")
+_FLAGS = ("renamed_main", "engine_in_package", "paired")
+
+
+def _flag(value):
+    return value if type(value) is bool else None
+
+
+def _layout(value) -> dict:
+    """A kept snapshot's closed shape: each count an int from 0 (anything else 0), each flag a bool or None, the app's
+    version a word, the shape one of SHAPES' or None."""
+    value = value if isinstance(value, dict) else {}
+    kept = {name: (value.get(name) if type(value.get(name)) is int and 0 <= value[name] < 10 ** 6 else 0)
+            for name in _COUNTS}
+    kept.update({name: _flag(value.get(name)) for name in _FLAGS})
+    shape = value.get("shape")
+    kept.update(app_version=_word(value.get("app_version")),
+                shape=shape if isinstance(shape, str) and shape in SHAPES.values() else None)
+    return kept
 
 
 def _write(path, value) -> None:

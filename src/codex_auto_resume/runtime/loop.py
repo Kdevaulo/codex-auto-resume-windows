@@ -507,7 +507,12 @@ class WatchLoop:
         except Exception:
             self._record_failure("the self-check")
             judge.look(now, None, {})
-        untested, updated = self._layout_said()
+        try:
+            untested, updated = self._layout_said()
+        except Exception:
+            # Audit-standards E2: what the layout file holds never ends the watcher; it costs the look alone.
+            self._record_failure("the self-check")
+            untested = updated = None
         written = public.self_check_note(started, judge.word(now), getattr(self, "_unknown_error", None),
                                          untested, updated)
         if written != getattr(self, "_self_check_written", None):
@@ -529,7 +534,7 @@ class WatchLoop:
         if not isinstance(kept, dict):
             return None, None
         found = kept.get("layout") if isinstance(kept.get("layout"), dict) else {}
-        app_open = (found.get("mains") or 0) > 0 or (found.get("helpers") or 0) > 0
+        app_open = any(type(found.get(name)) is int and found[name] > 0 for name in ("mains", "helpers"))
         # Fourth round A4: the engine's `codex --version` line stands in for an app version that could not be read (two
         # mains, a helper alone), as the version word the self-check keeps - never a text its readers refuse.
         untested = (public.version_word(kept.get("app_version")) or public.version_word(kept.get("engine_version"))
