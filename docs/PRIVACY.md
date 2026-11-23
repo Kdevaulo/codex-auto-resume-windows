@@ -660,6 +660,27 @@ default (or wherever `CODEX_AUTO_RESUME_PLUGIN_HOME`, or failing that
   edition coming back from a change of edition, and the next install deletes it. No path, id or text. It goes
   with the rest of `config/` under `Uninstall.cmd -Purge`, and the command line's `uninstall` deletes it unless
   you pass `--keep-state`;
+- `config/codex-layout.json`, from v0.6.26 — how the Codex app's processes were laid out at the watcher's last look
+  that changed: counted by role (the app's main processes, its helpers, the engines under each and elsewhere, whether
+  a server was paired), the app package's version as the digits Windows names its folder with, the Codex engine's
+  version, this product's version, whether that layout is one this version was tested on, and the same for the last
+  look that paired a server. The watcher writes it when the layout, the engine or the app's version changes, so that
+  the first looks after an update of this product can tell a layout that paired before and pairs no more. Counts,
+  versions and fixed words only: no path, process id, command line, conversation or text. It decides nothing.
+  It goes with the rest of `config/` under `Uninstall.cmd -Purge`, and the command line's `uninstall` deletes it
+  unless you pass `--keep-state`;
+- `config/selfcheck.json`, from v0.6.26 — the watcher's judgement of its own looks, written beside its heartbeat when
+  it changes: when that watcher started, one closed word where recovery or detection cannot work here (Codex changed;
+  see the guide), the newest error code Codex reported that this version does not know with how many in the last
+  day, Codex's version where it runs in a layout this version was not tested on, and the version of this product it
+  was updated from while no look since has paired a server. Closed words, a code, a count and versions: no id, path
+  or text. A reader shows it only while the watcher that wrote it still runs. It goes with the rest of `config/` under
+  `Uninstall.cmd -Purge`, and the command line's `uninstall` deletes it unless you pass `--keep-state`;
+- `config/settings.unreadable-<time>.json`, from v0.6.23, only when **Restore defaults** meets a settings file it
+  cannot read: that file, renamed beside it before the defaults are written, with the UTC time in its name. It holds
+  whatever the settings file held - a Custom message included - and nothing else reads it. From v0.6.26 at most five
+  are kept: a new copy deletes the oldest beyond that. They go with the rest of `config/` under
+  `Uninstall.cmd -Purge`, and the command line's `uninstall` deletes them unless you pass `--keep-state`;
 - `logs/` — `auto-resume.log`, what the watcher did, by reason code and conversation UUID;
   `errors.log`, the Python traceback when something goes wrong; `launcher.log`, a line
   per launch (and why, if one failed); and, from v0.6.9, `codex-start.log`, a line each time Codex

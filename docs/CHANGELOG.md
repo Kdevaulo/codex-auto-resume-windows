@@ -15,8 +15,8 @@ changed, the lists and bounds of *Install another version...*, the window's wait
 edition, a paused queue that is let go at the reset. Both editions change in the first group; the second is the advanced edition's alone.
 
 **Going back.** Nothing that an earlier version reads changes: the watcher's state, the settings file and the advanced edition's own file
-keep the versions they had. The watcher now also keeps one small file of its own beside them, `codex-layout.json` in its state folder -
-the last Codex layout it looked at - which an earlier version ignores.
+keep the versions they had. The watcher now also keeps two small files of its own beside them in its state folder, `codex-layout.json` -
+the last Codex layout it looked at - and `selfcheck.json` - its judgement of its own looks - which an earlier version ignores.
 
 ### Both editions
 
@@ -44,8 +44,6 @@ the last Codex layout it looked at - which an earlier version ignores.
   word names what it found instead of "Nothing else to do.". A usage read that broke, an error code Codex reported that this version
   does not know and a named engine the app does not run are each said. A Codex refusing a usage read - a signed-out account - no longer
   fails a protocol check; only a Codex that says it does not know the method does.
-- **A record that left Codex's queue is unproven an hour after the watcher's start, however often the watcher starts.** On a PC that is
-  shut down each night the day the record was given never ended, and the conversation's later records could not be claimed.
 - **Restore defaults never deletes the copy it has just set aside, whatever the clock says**, and keeps the newest five set-aside settings
   files and deletes the older ones. A settings string holding a lone surrogate is refused as a settings error, and an old file holding
   one no longer fails every save.
@@ -110,6 +108,9 @@ the last Codex layout it looked at - which an earlier version ignores.
   every other queued message with its words. It is now found by its proof where no queue id is known, never sent again, and its day counts
   from when it was last seen there. A chat message in a queue the forced stop paused is left with Codex, never taken back with its words
   gone.
+- **A queued prompt, reset message or chat message that left Codex's queue is unproven an hour after the watcher's start, however often
+  the watcher starts.** On a PC that is shut down each night the day the message was given never ended, and the conversation's later
+  messages could not be claimed.
 - **Codex refusing a usage read turns nothing off for good.** One signed-out read used to turn every capability standing on the usage
   read off and store it off, and a later good read did not turn it back on. Where a Codex home loses its lock folder, the five
   capabilities that route by whether the app holds the conversation get that grade instead, and the page says so.
@@ -119,7 +120,8 @@ the last Codex layout it looked at - which an earlier version ignores.
 - **Start right after a reset keeps a full weekly window's occasion a window past its reset, wakes the PC for it and reads a
   `config.toml` with a byte-order mark.** A PC asleep through the old ten minutes ended the occasion unread and the chain with it. The
   statements say which of the person's programs may run - the request switches off their MCP servers, hooks, plugins, apps and notify
-  program, and is sent once more without that where Codex refuses it - and the guide gives the request as it is.
+  program, and is sent once more without that where Codex refuses it, and where the Codex home's `config.toml` cannot be read here its
+  MCP servers may run - and the guide gives the request as it is.
 - **Account switching settles a switch whose account was read only at a later look as fully as one seen made at once**, and never takes a
   terminal's engine for the app's because the app was given its dead shell's id.
 - **The Python choice is tidier and bounded.** A runtime left whole when the choice was turned off goes at the next start, and no sweep

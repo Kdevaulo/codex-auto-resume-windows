@@ -857,6 +857,30 @@ A conversation that another Codex session holds - a terminal's TUI or the VS Cod
 failure to recover: it waits, with a reason of its own, until the Codex app holds it, and nothing is
 sent to it.
 
+**Codex changed; recovery cannot work here.** From v0.6.26 the watcher also judges its own looks, because an update -
+mostly Codex's - can leave every recovery waiting for ever under a reason that is no longer true. While a process of
+the Codex app runs and a recovery waits, it asks once a minute whether one of these holds:
+
+- a conversation waits because another session holds it, yet the holder of its lock holds Codex's newest databases and
+  the app's own server holds neither - Codex changed how it runs, so whether a conversation is open cannot be told;
+- Codex's folder of conversation locks is gone, so Codex no longer shows which conversations are open in the way this
+  product reads;
+- a newer generation of Codex's database is held by nobody while the app's server holds an older one - Codex keeps
+  its conversations where this product does not read;
+- for half an hour Codex has answered the usage read in a way this version does not know, so usage-limit recoveries
+  cannot learn the reset.
+
+One of them is said only after ten minutes of looks that all found it (at least five, none more than five minutes
+apart), and the first look that does not find it clears it; nothing is judged while the Codex app is not running. Two
+more are said, whether or not anything waits, after three of the watcher's ticks running: no Codex engine could be found
+or checked, and Codex's history could not be read, so new interruptions are not being detected. Then the Dashboard's
+header and its taskbar button ask for attention, a waiting row, the tray popup and the Codex panel read **Codex changed;
+recovery cannot work here**, and Diagnostics says which of them it is in a sentence of its own. It sends nothing and
+decides nothing: every recovery keeps waiting under its own checks, whether a conversation is open is still asked of
+Windows' Restart Manager alone, and no recovery is dropped or sent because of it. No setting of yours cures it; an
+update of this product that knows the new Codex does - press **Check for updates...** on the Diagnostics page, and if
+none is offered, use **Export diagnostics...** and report it.
+
 Codex itself retries a failed request a few times before a turn fails.
 
 A turn that fails because the conversation is longer than its model's context window is never retried
