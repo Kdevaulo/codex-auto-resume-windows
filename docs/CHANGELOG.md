@@ -2,7 +2,7 @@
 
 ## v0.6.26 — A watcher that says when Codex changed and recovery cannot work here, the reset message carried by the forced stop's own turn, release lists of up to twenty pages, moving pictures that move as the product does, and the last Python release
 
-> **The last Python release.** This release puts into both editions what the third and fourth rounds of audits and their reviews found, with a watcher that survives Codex's updates and moving pictures that follow the product, so that the Rust core of v0.6.27 has one finished Python version to reproduce.
+> **The last Python release.** This release gives both editions what the third and fourth rounds of audits found, a watcher that survives Codex's updates and pictures that follow the product, for the Rust core of v0.6.27 to reproduce.
 
 **Kind:** Bug fixes · Feature changes · Design changes · Performance · Languages · Under the hood
 
