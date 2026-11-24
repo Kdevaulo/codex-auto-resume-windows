@@ -344,14 +344,17 @@ namespace CodexAutoResume
                     }
                     finally { Heard = null; Asked = null; }
                     return answer == "installed" ? 0 : answer == "later" ? InstallerFlow.Later
-                         : answer.StartsWith("handover", StringComparison.Ordinal) ? InstallerFlow.HandedOver
+                         : answer == "handover" ? InstallerFlow.HandedOver
+                         // Not finished: the window keeps its log and ends on that program's code, as a failed installer's.
+                         : answer == "handover-unfinished" ? HandedCode
                          : answer == "running" ? InstallerFlow.StillRunning
                          : answer == "incomplete" ? InstallerFlow.NotStarted : HeardCode == 0 ? 1 : HeardCode;
                 }, null, Font);
             window.ShowDialog(this);
             updatingHere = false;
             // v0.6.26: handed over to the release's own setup program, which opens the new version's Dashboard as it ends:
-            // this one, the old version's, closes as after an update - unless that program did not finish (HandoverAnswer).
+            // this one, the old version's, closes as after an update. One that did not finish ended the window on its code, with
+            // the log (HandoverCode), and the card stays as it was.
             if (answer == "handover") { Close(); return; }
             if (answer == "later" || answer == "handover-unfinished")
             {
@@ -605,7 +608,23 @@ namespace CodexAutoResume
             // An install runs on past the line and exits with the installer's code.
             else if (code == 0 && said == "available") answer = "installed";
             else if (code == UpdateLater && said == "later") answer = "later";
-            else if (code == UpdateHandedOver && said == "handover" && words.Length == 4) answer = HandoverAnswer(words[3]);
+            else if (code == UpdateHandedOver && said == "handover" && words.Length == 4)
+            {
+                answer = HandoverAnswer(words[3]);
+                HandedCode = HandoverCode(words[3]);
+            }
+        }
+
+        /// The setup program's exit code a handover that did not finish ended with, for the installer window (RunBootstrap).
+        [ThreadStatic] private static int HandedCode;
+
+        /// The window's ending for a handover that did not finish: that program's code - or 1 where the word is no integer,
+        /// is 0, or is one of the window's own codes (InstallerFlow), which it would read as something else. Pure.
+        internal static int HandoverCode(string word)
+        {
+            int code;
+            if (!int.TryParse(word, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out code)) return 1;
+            return code == 0 || code == int.MinValue || (code >= InstallerFlow.HandedOver && code <= InstallerFlow.NotStarted) ? 1 : code;
         }
 
         /// What a handover ended as, from the setup program's exit code on its line: "handover" where it ended with 0, and

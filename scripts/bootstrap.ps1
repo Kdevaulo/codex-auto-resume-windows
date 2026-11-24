@@ -2177,8 +2177,11 @@ function Read-SetupHandover {
         }
         if (@($names -ceq $marker).Count -ne 1 -or $entry.Length -gt 65536) { throw 'The archive''s setup handover is not one small file.' }
         foreach ($name in $names) {
-            if ($name -match '(^|[\\/])\.\.([\\/]|$)' -or $name -match '^([\\/]|[A-Za-z]:)') { throw ('The archive contains an unsafe path: ' + $name) }
+            # A ':' anywhere names a stream of another file (setup.exe:hidden), never a file of its own.
+            if ($name -match '(^|[\\/])\.\.([\\/]|$)' -or $name -match '^([\\/]|[A-Za-z]:)' -or $name.Contains(':')) { throw ('The archive contains an unsafe path: ' + $name) }
         }
+        # Each name once, in any casing: a second entry by a name would be what the extraction writes in the first's place.
+        if (@($names | Sort-Object -Unique).Count -ne $names.Count) { throw 'The archive names an entry more than once.' }
         $reader = New-Object IO.StreamReader($entry.Open())
         try {
             $said = $reader.ReadToEnd() | ConvertFrom-Json
@@ -2965,15 +2968,24 @@ try {
         if ($plan.Verdict -eq 'change') { $handed += '-AllowEditionChange' }
         if ($DeleteSavedAccounts -and (Test-DeleteSavedAccounts -Pick ([bool]$Pick) -Verdict $plan.Verdict -Edition $targetEdition -Target $target)) {
             $handed += '-DeleteSavedAccounts'
+        } elseif ($DeleteSavedAccounts) {
+            Warn '-DeleteSavedAccounts only goes with a pick that changes to the standard edition in a version that has it, so the saved Codex accounts were kept.'
         }
         Step ('Handing over to the setup program of v' + $target + '. Its own window installs it.')
         $env:CODEX_AUTO_RESUME_PLUGIN_HOME = $installHome
-        $setupRun = Start-Process -FilePath $setupProgram -ArgumentList $handed -WorkingDirectory (Split-Path -Parent $setupProgram) -PassThru
+        # Never elevated: RunAsInvoker, for this start alone, is the shell's word for "the caller's own rights" - no UAC
+        # prompt for a manifest that asks for an administrator or for a name that looks like an installer, which would
+        # otherwise run elevated from this user's TEMP folder. A program that does need more fails by itself.
+        $compatLayer = $env:__COMPAT_LAYER
+        $env:__COMPAT_LAYER = 'RunAsInvoker'
+        try { $setupRun = Start-Process -FilePath $setupProgram -ArgumentList $handed -WorkingDirectory (Split-Path -Parent $setupProgram) -PassThru }
+        finally { $env:__COMPAT_LAYER = $compatLayer }
         $started = $true
         $null = $setupRun.Handle
         $setupRun.WaitForExit()
         $ended = $setupRun.ExitCode
-        Ok ('Handed over to the setup program of v' + $target + ', which ended with code ' + $ended + '.')
+        if ($ended -eq 0) { Ok ('Handed over to the setup program of v' + $target + ', which ended with code 0.') }
+        else { Step ('Handed over to the setup program of v' + $target + ', which did not finish: it ended with code ' + $ended + '.') }
         $from = $pluginVersion
         if ($installed) { $from = $installed }
         if ($Pick) { Write-Host ('pick: handover ' + $target + ' ' + $targetEdition + ' ' + $ended) }

@@ -26,6 +26,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import warnings
 import zipfile
 
 _HERE = str(Path(__file__).resolve().parent)
@@ -35,6 +36,7 @@ if _HERE not in sys.path:
 import guiscan  # noqa: E402
 from download_standin import BRIDGE  # noqa: E402
 from test_edition_bootstrap import PACKAGE, required_entries, stub_installer  # noqa: E402
+import test_version_picker as picker  # noqa: E402  (its PickerRun harness; none of its tests run here)
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
@@ -63,6 +65,8 @@ static class Program
             var text = new StringBuilder();
             text.Append("home=").Append(Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_PLUGIN_HOME")).Append('\n');
             text.Append("beside=").Append(File.Exists(Path.Combine(folder, "beside.txt"))).Append('\n');
+            text.Append("compat=").Append(Environment.GetEnvironmentVariable("__COMPAT_LAYER")).Append('\n');
+            text.Append("lock=").Append(Free() ? "free" : "held").Append('\n');
             foreach (string argument in arguments) text.Append("arg=").Append(argument).Append('\n');
             File.WriteAllText(Environment.GetEnvironmentVariable("CAR_HANDED"), text.ToString());
             int code;
@@ -71,6 +75,19 @@ static class Program
         catch (Exception)
         {
             return 99;
+        }
+    }
+
+    // Whether the install lock is free for another process: the bootstrap must hold none while this program installs.
+    static bool Free()
+    {
+        using (var held = new System.Threading.Mutex(false, @"Local\CodexAutoResume.Install"))
+        {
+            bool got;
+            try { got = held.WaitOne(0); }
+            catch (System.Threading.AbandonedMutexException) { got = true; }
+            if (got) held.ReleaseMutex();
+            return got;
         }
     }
 }
@@ -112,18 +129,23 @@ def compiled(source: str, out: Path, target: str) -> Path:
     return out
 
 
+PROGRAMS = {}
+
+
+def programs() -> dict:
+    """The stand-in as a Windows program and as a console one, compiled once for the module."""
+    if not PROGRAMS:
+        with tempfile.TemporaryDirectory() as folder:
+            PROGRAMS["gui"] = compiled(STAND_IN, Path(folder) / "gui.exe", "winexe").read_bytes()
+            PROGRAMS["console"] = compiled(STAND_IN, Path(folder) / "console.exe", "exe").read_bytes()
+    return PROGRAMS
+
+
 @unittest.skipUnless(POWERSHELL.is_file() and CSC.is_file(), "needs Windows PowerShell and the in-box C# compiler")
 class HandoverRunTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.programs = tempfile.TemporaryDirectory()
-        folder = Path(cls.programs.name)
-        cls.gui = compiled(STAND_IN, folder / "gui.exe", "winexe").read_bytes()
-        cls.console = compiled(STAND_IN, folder / "console.exe", "exe").read_bytes()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.programs.cleanup()
+        cls.gui, cls.console = programs()["gui"], programs()["console"]
 
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
@@ -184,7 +206,7 @@ class HandoverRunTests(unittest.TestCase):
                         bundle.writestr(entry, "x")
         return path
 
-    def run_it(self, latest=None, served=None, setup_code=None, given="", **arguments):
+    def run_it(self, latest=None, served=None, setup_code=None, given="", digest=None, **arguments):
         environment = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home), CODEX_AUTO_RESUME_OUTSIDE="1",
                            TEMP=str(self.temp), TMP=str(self.temp),
                            CAR_SCRIPT=str(self.plugin / "scripts" / "bootstrap.ps1"),
@@ -194,7 +216,7 @@ class HandoverRunTests(unittest.TestCase):
                            CAR_SETUP_CODE="" if setup_code is None else str(setup_code))
         if served:
             total = self.root / "served.sha256"
-            total.write_text("%s  served.zip\n" % hashlib.sha256(served.read_bytes()).hexdigest(), encoding="utf-8")
+            total.write_text("%s  served.zip\n" % (digest or hashlib.sha256(served.read_bytes()).hexdigest()), encoding="utf-8")
             environment.update(CAR_ZIP=str(served), CAR_SUM=str(total))
         done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                                "-Command", RUN], input=given, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -202,9 +224,15 @@ class HandoverRunTests(unittest.TestCase):
         return done.returncode, done.stdout
 
     def handed_over(self) -> dict:
-        lines = self.handed.read_text(encoding="utf-8").splitlines()
-        return {"home": lines[0][len("home="):], "beside": lines[1][len("beside="):],
-                "arguments": [line[len("arg="):] for line in lines[2:]]}
+        """What the stand-in wrote: each key=value line, with every `arg` in order under "arguments"."""
+        said = {"arguments": []}
+        for line in self.handed.read_text(encoding="utf-8").splitlines():
+            key, _, value = line.partition("=")
+            if key == "arg":
+                said["arguments"].append(value)
+            else:
+                said[key] = value
+        return said
 
     def assertLeftNothing(self):
         self.assertEqual(sorted(self.temp.glob("codex-auto-resume-*")), [], "the run's folder outlived it")
@@ -229,7 +257,9 @@ class HandoverRunTests(unittest.TestCase):
         self.assertNotIn("Archive contents verified", output, "it is not the shape Test-Archive checks")
         for word in ("Installing", "Installation did not finish", "[!]"):
             self.assertNotIn(word, output)
-        self.assertEqual(self.handed_over(), {"home": str(self.home), "beside": "True",
+        # Never elevated (RunAsInvoker), and with no install lock held: the program takes it itself.
+        self.assertEqual(self.handed_over(), {"home": str(self.home), "beside": "True", "compat": "RunAsInvoker",
+                                              "lock": "free",
                                               "arguments": ["-Handover", "install", "-Edition", "standard",
                                                             "-SkipStartup"]})
         self.assertFalse(self.installed.exists())
@@ -245,7 +275,47 @@ class HandoverRunTests(unittest.TestCase):
         answers = [line for line in output.splitlines() if line.startswith("update: ")]
         self.assertEqual(answers, ["update: available 0.6.0 9.9.9", "update: handover 0.6.0 9.9.9 3"])
         self.assertEqual(self.handed_over()["arguments"], ["-Handover", "update", "-Edition", "standard"])
+        self.assertIn("  Handed over to the setup program of v9.9.9, which did not finish: it ended with code 3.", output)
+        self.assertNotIn("[ok] Handed over", output)
         self.assertLeftNothing()
+
+    def test_a_crashed_setup_program_is_said_not_to_have_finished(self):
+        code, output = self.run_it(ArchivePath=str(self.archive()), setup_code=-1073741819)
+        self.assertEqual(code, 17, output[-2000:])
+        self.assertIn("which did not finish: it ended with code -1073741819.", output)
+        self.assertNotIn("[ok] Handed over", output)
+
+    def test_a_wrong_checksum_refuses_before_anything_of_the_archive_runs(self):
+        self.installation("0.6.0")
+        code, output = self.run_it(latest="v9.9.9", served=self.archive(), digest=hashlib.sha256(b"other").hexdigest(),
+                                   Update=True)
+        self.assertEqual(code, 1, output[-2000:])
+        self.assertIn("The download does not match its published checksum.", output)
+        self.assertNotIn("setup program", output)
+        self.assertFalse(self.handed.exists(), "the setup program ran")
+        self.assertLeftNothing()
+
+    def test_delete_saved_accounts_where_the_rule_refuses_it_is_said_and_not_passed_on(self):
+        code, output = self.run_it(ArchivePath=str(self.archive()), DeleteSavedAccounts=True)
+        self.assertEqual(code, 17, output[-2000:])
+        self.assertIn("so the saved Codex accounts were kept.", output)
+        self.assertEqual(self.handed_over()["arguments"], ["-Handover", "install", "-Edition", "standard"])
+
+    def test_a_second_entry_by_a_name_or_a_stream_name_is_refused(self):
+        doubled = self.archive("doubled.zip")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with zipfile.ZipFile(doubled, "a") as bundle:
+                bundle.writestr(SETUP, self.console)          # another program by the very name
+        self.refused(doubled, "names an entry more than once")
+        cased = self.archive("cased.zip")
+        with zipfile.ZipFile(cased, "a") as bundle:
+            bundle.writestr(SETUP.upper(), self.console)
+        self.refused(cased, "names an entry more than once")
+        streamed = self.archive("streamed.zip")
+        with zipfile.ZipFile(streamed, "a") as bundle:
+            bundle.writestr(SETUP + ":hidden", "x")
+        self.refused(streamed, "unsafe path")
 
     def test_an_asked_for_edition_change_is_passed_on_and_the_edition_is_named(self):
         self.installation("0.6.0", "standard")
@@ -352,6 +422,58 @@ class HandoverRunTests(unittest.TestCase):
         self.refused(self.archive(python=True, plugin_version="9.9.8"), "The archive is version 9.9.8, not 9.9.9.")
 
 
+@unittest.skipUnless(POWERSHELL.is_file() and CSC.is_file(), "needs Windows PowerShell and the in-box C# compiler")
+class PickHandoverTests(picker.PickerRun):
+    """-Pick of a release that hands over: the list read again and the row still offered, then no lock taken and no
+    state converted - a release that hands over is on this version's schema - and `-Handover another`."""
+
+    archive = HandoverRunTests.archive
+    handed_over = HandoverRunTests.handed_over
+
+    def setUp(self):
+        super().setUp()
+        self.gui, self.console = programs()["gui"], programs()["console"]
+        script = self.plugin / "scripts" / "bootstrap.ps1"
+        text = script.read_text(encoding="utf-8")
+        text = picker.replace_function(picker.replace_function(text, "Convert-StateForOlder", picker.CONVERT_STUB),
+                                       "Start-CurrentWatcher", picker.RESTART_STUB)
+        script.write_text(text, encoding="utf-8")
+        self.events = self.root / "events.txt"
+        self.handed = self.root / "handed.txt"
+        self.serve([picker.entry("9.9.9"), picker.entry(picker.INSTALLED), picker.entry("0.6.11")])
+        self.zip = self.archive()
+        self.sum = self.root / "served.sha256"
+        self.sum.write_text("%s  x.zip\n" % hashlib.sha256(self.zip.read_bytes()).hexdigest(), encoding="utf-8")
+
+    def pick(self, **arguments):
+        more = {"CAR_EVENTS": str(self.events), "CAR_CONVERT": "converted 1 0 0 0 0", "CAR_PYTHON": sys.executable,
+                "CAR_LOCK_PROBE": picker.LOCK_PROBE, "CAR_HANDED": str(self.handed), "CAR_SETUP_CODE": ""}
+        code, output, _ = self.run_it(more=more, Pick="9.9.9", **arguments)
+        return code, output
+
+    def test_a_pick_hands_over_with_no_lock_and_no_conversion(self):
+        self.installation(picker.INSTALLED)
+        code, output = self.pick(Edition="Standard")
+        self.assertEqual(code, 17, output[-2000:])
+        lines = self.answer_lines(output, "pick: ")
+        self.assertEqual(len(lines), 2, lines)
+        self.assertTrue(lines[0].startswith("pick: offered newer,"), lines)
+        self.assertEqual(lines[1], "pick: handover 9.9.9 standard 0")
+        said = self.handed_over()
+        self.assertEqual(said["arguments"], ["-Handover", "another", "-Edition", "standard"])
+        self.assertEqual(said["lock"], "free")
+        self.assertFalse(self.events.exists(), "the state was converted or the watcher started again")
+        self.assertFalse(self.installed.exists(), "install.ps1 ran")
+
+    def test_delete_saved_accounts_is_passed_on_where_the_rule_passes_it(self):
+        self.installation(picker.INSTALLED, "advanced")
+        code, output = self.pick(Edition="Standard", Force=True, DeleteSavedAccounts=True)
+        self.assertEqual(code, 17, output[-2000:])
+        self.assertNotIn("saved Codex accounts were kept", output)
+        self.assertEqual(self.handed_over()["arguments"],
+                         ["-Handover", "another", "-Edition", "standard", "-AllowEditionChange", "-DeleteSavedAccounts"])
+
+
 LIFT = r"""
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
@@ -406,7 +528,9 @@ $flags = [Reflection.BindingFlags]'Static,NonPublic,Public'
 $run = $form.GetMethod('RunBootstrap', $flags)
 $pick = $form.GetMethod('PickLine', $flags)
 $code = $form.GetMethod('PickCode', $flags)
-$out = @{ updates = @{}; picks = @{}; codes = @{} }
+$handedCode = $form.GetField('HandedCode', $flags)
+$handoverCode = $form.GetMethod('HandoverCode', $flags)
+$out = @{ updates = @{}; picks = @{}; codes = @{}; handed = @{}; endings = @{} }
 $work = [string]$env:CAR_WORK
 foreach ($case in (ConvertFrom-Json $env:CAR_UPDATES).PSObject.Properties) {
     $script = [string](Join-Path $work ($case.Name + '.ps1'))
@@ -417,16 +541,21 @@ foreach ($case in (ConvertFrom-Json $env:CAR_UPDATES).PSObject.Properties) {
     $arguments = [object[]]@($work, $script, '-Update', 60000, $null, $null, $null, $null, $null, $null, $null)
     $null = $run.Invoke($null, $arguments)
     $out.updates[$case.Name] = @($arguments[4], $arguments[5], $arguments[6])
+    $out.handed[$case.Name] = $handedCode.GetValue($null)
+    $handedCode.SetValue($null, 0)
 }
 foreach ($case in (ConvertFrom-Json $env:CAR_PICKS).PSObject.Properties) {
     $arguments = [object[]]@([string]$case.Value[0], [int]$case.Value[1], $null, $null, $null)
     $outcome = $pick.Invoke($null, $arguments)
-    $out.picks[$case.Name] = @($outcome, $arguments[4])
+    $out.picks[$case.Name] = @($outcome, $arguments[4], $arguments[2])
 }
 foreach ($outcome in 'handover', 'handover-unfinished', 'installed', 'failed') {
     $out.codes[$outcome] = $code.Invoke($null, [object[]]@('done', $outcome, 17))
 }
 $out.handed_over = $flow.GetField('HandedOver', $flags).GetValue($null)
+foreach ($word in '3', '-1073741819', '1602', '-1', '-2', '-3', '-4', '0', '-2147483648', 'x', '') {
+    $out.endings[$word] = $handoverCode.Invoke($null, [object[]]@([string]$word))
+}
 $out | ConvertTo-Json -Depth 5 -Compress
 """
 
@@ -473,12 +602,25 @@ class DashboardReadsTheHandoverTests(unittest.TestCase):
     def test_the_pick_line_is_read_in_its_closed_grammar(self):
         for name, (_, _, outcome, installed) in PICKS.items():
             with self.subTest(name):
-                self.assertEqual(self.answer["picks"][name], [outcome, installed])
+                self.assertEqual(self.answer["picks"][name][:2], [outcome, installed])
+        self.assertEqual(self.answer["picks"]["not_finished"][2], "5", "the setup program's code, for the window")
+
+    def test_a_handover_that_did_not_finish_ends_the_window_on_its_code(self):
+        """The window keeps its log and says "It did not finish (exit code N)." as for a failed installer, in every
+        language the window speaks - never one of the window's own codes, which it would read as something else."""
+        self.assertEqual(self.answer["handed"]["not_finished"], 1602)
+        self.assertEqual(self.answer["handed"]["installed_as_before"], 0, "set by a handover alone")
+        self.assertEqual(self.answer["endings"], {"3": 3, "-1073741819": -1073741819, "1602": 1602, "-1": 1, "-2": 1,
+                                                  "-3": 1, "-4": 1, "0": 1, "-2147483648": 1, "x": 1, "": 1})
+        update = guiscan.member_body("SettingsForm", "InstallUpdate")
+        self.assertIn(': answer == "handover-unfinished" ? HandedCode', update)
+        pick = guiscan.member_body("SettingsForm", "InstallPick")
+        self.assertIn('return outcome == "handover-unfinished" ? HandoverCode(reason) : PickCode(ran, outcome, code);', pick)
 
     def test_a_handover_is_the_windows_own_ending_never_an_exit_code(self):
         handed = self.answer["handed_over"]
         self.assertLess(handed, 0)
-        self.assertEqual(self.answer["codes"], {"handover": handed, "handover-unfinished": handed, "installed": 0,
+        self.assertEqual(self.answer["codes"], {"handover": handed, "handover-unfinished": 17, "installed": 0,
                                                 "failed": 17})
         ended = guiscan.member_body("InstallerWindow", "Ended")
         self.assertIn("if (ended == InstallerFlow.Later || ended == InstallerFlow.HandedOver)", ended)
@@ -505,6 +647,13 @@ class SourceTests(unittest.TestCase):
             "$pickLock.WaitOne(0)", "& $installer @arguments")]
         self.assertEqual(order, sorted(order))
         self.assertEqual(run.count("Start-Process"), 1)
+
+    def test_the_setup_program_is_started_as_invoker_for_that_start_alone(self):
+        start = self.text.index("$env:__COMPAT_LAYER = 'RunAsInvoker'")
+        self.assertLess(self.text.index("$compatLayer = $env:__COMPAT_LAYER"), start)
+        self.assertIn("try { $setupRun = Start-Process -FilePath $setupProgram", self.text[start:start + 200])
+        self.assertIn("finally { $env:__COMPAT_LAYER = $compatLayer }", self.text[start:start + 400])
+        self.assertEqual(self.text.count("__COMPAT_LAYER"), 3)
 
 
 if __name__ == "__main__":
