@@ -2288,6 +2288,13 @@ try {
         & $Python -X disable-remote-debug -c 'import sys;print(str(sys.version_info[0])+chr(46)+str(sys.version_info[1]))'
     }) | Where-Object { $_ -is [string] } | Select-Object -First 1
     Ok ('Bundled Python ' + $runtimeVersion + ' (no system Python needed)')
+    # v0.6.26 final: where the advanced edition's chosen Python runs the watcher (Get-CompilePythons, the same rule as the
+    # compile above), the log says so beside the bundled one, which still runs setup and the launcher - the line above
+    # alone read as if the watcher ran on the bundled one (2026-11-24 acceptance).
+    $watcherPythons = Get-CompilePythons -Edition ([string](Get-Variable -Name edition -ValueOnly -ErrorAction SilentlyContinue))
+    if ($watcherPythons.Count -gt 1) {
+        Ok ('The watcher runs on the chosen Python ' + (Split-Path -Leaf (Split-Path -Parent $watcherPythons[1])))
+    }
 
     # The payload is itself a valid local marketplace, so the plugin installs from the bytes
     # already on disk rather than from GitHub, with no network access. Nothing *here*
