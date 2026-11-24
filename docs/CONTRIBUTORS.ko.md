@@ -82,6 +82,8 @@
   수정과 함께 알려 주셨습니다([#66](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/66)).
 - [@a115599663322](https://github.com/a115599663322) 님은 Codex 앱이 서버를 앱 자신의 도우미 프로세스 아래에서 시작하면 모든 복구가 기다리기만 한다는 것을,
   원인을 코드에서 읽어 내고 패치와 함께 알려 주셨습니다([#67](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/67)).
+- [@harshespop](https://github.com/harshespop) 님은 그 수정 전 버전에서 사용량 한도 재설정 때 같은 기다림이 생긴다는 것을, 프로세스 트리와 워처의 시간순 기록, 코드에서 읽어 낸 규칙과
+  함께 알려 주셨습니다([#68](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/68)).
 
 ## AI 기여자에 대한 참고
 
