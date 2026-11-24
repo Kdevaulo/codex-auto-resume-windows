@@ -57,6 +57,10 @@ continuation's words with its doubt, so v0.6.25 starts nothing beside the messag
   only a process in the package's app folder or its own folder can be a main; the package's other programs count as the app's only
   under a main. The package's small update program `app\Codex.exe` is never taken for an engine either: it is never paired, counted as
   served or run with `--version`.
+- **An update to a release whose archive carries its own setup program is installed by that program.** From v0.6.27, whose core is
+  no longer Python, a release can name its setup program in its verified archive. Check for updates and *Install another version...*
+  then hand over to that program, after every check an archive passes today, and say so; an archive like this release's is installed
+  as before.
 - **The health check tells a closed ChatGPT app from a broken one.** A closed app reads "not running (not a problem: recoveries wait
   until it opens)" instead of failing the check, a Run value whose interpreter or launcher is gone is a failure, and the installer's last
   word names what it found instead of "Nothing else to do.". A usage read that broke, an error code Codex reported that this version
@@ -165,6 +169,13 @@ continuation's words with its doubt, so v0.6.25 starts nothing beside the messag
 - **Codex refusing a usage read turns nothing off for good.** One signed-out read used to turn every capability standing on the usage
   read off and store it off, and a later good read did not turn it back on. Where a Codex home loses its lock folder, the five
   capabilities that route by whether the app holds the conversation get that grade instead, and the page says so.
+- **The usage meter reads while the Codex app runs its server from its own package and nothing waits for recovery.** It read nothing
+  then - the watcher took up the engine the app runs only through a waiting record's look - so the popup kept a reading days old (found
+  at this release's live acceptance). A look that does not read now waits a minute before the next, on the engine it already checked,
+  instead of checking the engine again every 30 seconds.
+- **The Dashboard's Overview and Diagnostics say the same usage reading as the popup**: the newer of the watcher's own and the usage
+  meter's, in the shape the watcher's has. The Dashboard used to show the watcher's older one.
+- **An update's log says when a chosen Python is in place for the watcher**, beside the bundled one that runs setup.
 - **The self-check's recovery rules see the waiting records the edition hands over** - a queued prompt, a reset message, a chat message
   or a continuation - so a Codex change that only such a record could have shown is said too. A usage meter that read nothing now
   journals why.
