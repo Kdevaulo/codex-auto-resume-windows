@@ -571,6 +571,9 @@ class BootstrapTests(unittest.TestCase):
         # update question nor any refusal above.
         later = codes.pop("ExitLater")
         self.assertNotIn(later, list(codes.values()) + [refused, other, picked], "putting it off shares a code")
+        # v0.6.26: handed over to a release's own setup program, which is neither an install nor any answer above.
+        handed = codes.pop("ExitHandedOver")
+        self.assertNotIn(handed, list(codes.values()) + [refused, other, picked, later], "the handover shares a code")
         self.assertEqual(set(codes), {"ExitCurrent", "ExitAvailable", "ExitLocalNewer",
                                       "ExitUnavailable"})
         self.assertEqual(len(set(codes.values())), 4, "two answers share a code")
