@@ -2188,7 +2188,8 @@ function Read-SetupHandover {
             if ($null -eq $said) { throw 'empty' }
         } catch { throw 'The archive''s setup handover is not JSON.' } finally { $reader.Dispose() }
         $field = @{}
-        foreach ($key in 'format', 'version', 'edition', 'setup') {
+        # The marker's four keys, in double quotes: the word setup in single ones is the installed setup's command alone.
+        foreach ($key in "format", "version", "edition", "setup") {
             $property = $said.PSObject.Properties[$key]
             if ($null -eq $property -or $property.Value -isnot [string]) { throw ('The archive''s setup handover has no ' + $key + '.') }
             $field[$key] = $property.Value
