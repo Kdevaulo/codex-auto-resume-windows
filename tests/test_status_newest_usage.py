@@ -21,6 +21,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from codex_auto_resume import control  # noqa: E402
+from codex_auto_resume.control import wire  # noqa: E402
 from codex_auto_resume.domain import usage as usage_rule  # noqa: E402
 from codex_auto_resume.domain.plug import EXTRA, Edition, Plug, Surface  # noqa: E402
 from codex_auto_resume.ui.popup import model  # noqa: E402
@@ -33,6 +34,11 @@ WATCHER = {"read_at": NOW - 4 * 86400, "windows": [
 METER = {"read_at": NOW - 4 * 86400 + 600, "notices": [], "windows": [
     {"bucket": "codex", "window_minutes": 300, "used_percent": 12, "reset_at": NOW + 3600, "band": "none"},
     {"bucket": "codex", "window_minutes": 10080, "used_percent": 2, "reset_at": NOW + 86400, "band": "none"}]}
+
+
+# The meter's windows as core keeps a window: the slot the watcher's reading gave each, the band left out.
+SHAPED = [{"bucket": "codex", "window": "primary", "used_percent": 12, "window_minutes": 300, "reset_at": NOW + 3600},
+          {"bucket": "codex", "window": "secondary", "used_percent": 2, "window_minutes": 10080, "reset_at": NOW + 86400}]
 
 
 class MeterPlug(Plug):
@@ -60,7 +66,7 @@ class StatusTests(ControlTestCase):
 
     def test_the_status_carries_the_meters_reading_where_it_is_newer(self):
         status = self.status(MeterPlug(METER))
-        self.assertEqual(status["watcher"]["usage"], {"read_at": METER["read_at"], "windows": METER["windows"]})
+        self.assertEqual(status["watcher"]["usage"], {"read_at": METER["read_at"], "windows": SHAPED})
         # The meter's own fields stay where the plug put them.
         self.assertEqual(status[EXTRA]["meter"], METER)
 
@@ -69,6 +75,24 @@ class StatusTests(ControlTestCase):
         # The popup's rule over the status is the status's own reading; the Dashboard, the panel and the checkup read
         # that same `watcher.usage` (gui/DashboardData.cs WaitingLine, mcp/assets/panel.js, checkup._usage).
         self.assertEqual(model.newest_reading(status), status["watcher"]["usage"])
+
+    def test_the_advanced_status_keeps_cores_wire_type_and_allowlist(self):
+        """watcher.usage is a wire.UsageReading whichever reading it is: every window exactly UsageWindow's keys, and
+        what core's own allowlist (domain/usage.windows_of) keeps - the meter's band never reaches it."""
+        declared = set(wire.UsageWindow.__annotations__)
+        for reading in (WATCHER, None):
+            with self.subTest(watcher=reading is not None):
+                usage = self.status(MeterPlug(METER), reading)["watcher"]["usage"]
+                self.assertEqual(set(usage), set(wire.UsageReading.__annotations__))
+                for window in usage["windows"]:
+                    self.assertEqual(set(window), declared)
+                self.assertEqual(usage_rule.windows_of(usage), usage["windows"])
+
+    def test_a_meter_reading_core_cannot_keep_leaves_the_watchers(self):
+        broken = dict(METER, windows=[dict(METER["windows"][0], used_percent="12")])
+        self.assertEqual(self.status(MeterPlug(broken))["watcher"]["usage"], WATCHER)
+        odd = dict(METER, windows=[dict(METER["windows"][0], window_minutes=300.5)])
+        self.assertEqual(self.status(MeterPlug(odd))["watcher"]["usage"], WATCHER)
 
     def test_the_watchers_reading_stays_where_it_is_newer(self):
         newer = dict(WATCHER, read_at=METER["read_at"] + 1)
