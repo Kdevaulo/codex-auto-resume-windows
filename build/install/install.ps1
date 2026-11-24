@@ -2288,12 +2288,19 @@ try {
         & $Python -X disable-remote-debug -c 'import sys;print(str(sys.version_info[0])+chr(46)+str(sys.version_info[1]))'
     }) | Where-Object { $_ -is [string] } | Select-Object -First 1
     Ok ('Bundled Python ' + $runtimeVersion + ' (no system Python needed)')
-    # v0.6.26 final: where the advanced edition's chosen Python runs the watcher (Get-CompilePythons, the same rule as the
-    # compile above), the log says so beside the bundled one, which still runs setup and the launcher - the line above
-    # alone read as if the watcher ran on the bundled one (2026-11-24 acceptance).
-    $watcherPythons = Get-CompilePythons -Edition ([string](Get-Variable -Name edition -ValueOnly -ErrorAction SilentlyContinue))
-    if ($watcherPythons.Count -gt 1) {
-        Ok ('The watcher runs on the chosen Python ' + (Split-Path -Leaf (Split-Path -Parent $watcherPythons[1])))
+    # v0.6.26 final: where the advanced edition has a chosen Python every launcher would take, the log says so beside
+    # the bundled one, which still runs setup - the line above alone read as if the watcher ran on the bundled one
+    # (2026-11-24 acceptance). Which one is the program's own rule (chosen_runtime.chosen: the record, and every file
+    # its version requires), asked of the program just copied; the edition still takes the choice back at the
+    # watcher's start where its switch is off, so the line says what is in place, not what will run.
+    if ([string](Get-Variable -Name edition -ValueOnly -ErrorAction SilentlyContinue) -eq 'advanced') {
+        $chosenVersion = @(& {
+            $ErrorActionPreference = 'Continue'
+            & $Python -X disable-remote-debug -I -c 'import sys;sys.path.insert(0,sys.argv[1]);from codex_auto_resume import chosen_runtime;print(chosen_runtime.chosen(sys.argv[2]) or chr(45))' ([string](Get-Variable -Name compileSource -ValueOnly -ErrorAction SilentlyContinue)) $InstallHome
+        }) | Where-Object { $_ -is [string] } | Select-Object -First 1
+        if ([string]$chosenVersion -cmatch '^3\.[1-9][0-9]\.(0|[1-9][0-9]{0,2})$') {
+            Ok ('Chosen Python ' + $chosenVersion + ' in place; the watcher uses it while that choice is on')
+        }
     }
 
     # The payload is itself a valid local marketplace, so the plugin installs from the bytes
