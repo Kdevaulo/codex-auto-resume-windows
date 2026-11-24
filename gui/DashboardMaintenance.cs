@@ -224,6 +224,9 @@ namespace CodexAutoResume
         private const int UpdateUnavailable = 12;
         // v0.6.16: the person put the update off on its Notes page (the bootstrap's -AskFirst, `update: later`).
         private const int UpdateLater = 16;
+        // v0.6.26: the archive was installed by its own setup program (the bootstrap's `update: handover` and
+        // `pick: handover` lines, with that program's exit code), neither failed nor installed by the bootstrap.
+        private const int UpdateHandedOver = 17;
         // One request against a redirect. An install downloads a release and runs the
         // installer over it, on whatever connection the machine has.
         private const int CheckMilliseconds = 120000;
@@ -341,14 +344,18 @@ namespace CodexAutoResume
                     }
                     finally { Heard = null; Asked = null; }
                     return answer == "installed" ? 0 : answer == "later" ? InstallerFlow.Later
+                         : answer.StartsWith("handover", StringComparison.Ordinal) ? InstallerFlow.HandedOver
                          : answer == "running" ? InstallerFlow.StillRunning
                          : answer == "incomplete" ? InstallerFlow.NotStarted : HeardCode == 0 ? 1 : HeardCode;
                 }, null, Font);
             window.ShowDialog(this);
             updatingHere = false;
-            if (answer == "later")
+            // v0.6.26: handed over to the release's own setup program, which opens the new version's Dashboard as it ends:
+            // this one, the old version's, closes as after an update - unless that program did not finish (HandoverAnswer).
+            if (answer == "handover") { Close(); return; }
+            if (answer == "later" || answer == "handover-unfinished")
             {
-                // Put off: the release is still there to install, as the check found it.
+                // Put off, or a setup program that did not finish: the release is still there to install, as the check found it.
                 SetBusy(false);
                 diagUpdate.Text = UpdateFact("available", from, to);
                 return;
@@ -598,6 +605,14 @@ namespace CodexAutoResume
             // An install runs on past the line and exits with the installer's code.
             else if (code == 0 && said == "available") answer = "installed";
             else if (code == UpdateLater && said == "later") answer = "later";
+            else if (code == UpdateHandedOver && said == "handover" && words.Length == 4) answer = HandoverAnswer(words[3]);
+        }
+
+        /// What a handover ended as, from the setup program's exit code on its line: "handover" where it ended with 0, and
+        /// "handover-unfinished" otherwise - the installation is as that program left it, and its window said how. Pure.
+        internal static string HandoverAnswer(string code)
+        {
+            return code == "0" ? "handover" : "handover-unfinished";
         }
 
         /// The one-line fact beside "Updates" on the Health card.

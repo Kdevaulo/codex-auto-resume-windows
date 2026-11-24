@@ -540,7 +540,8 @@ namespace CodexAutoResume
                     if (ran == "done")
                     {
                         outcome = PickLine(printed, code, out reason, out converted, out installed);
-                        if (outcome == "installed" && installed != version + " " + edition) outcome = "failed";
+                        if ((outcome == "installed" || outcome.StartsWith("handover", StringComparison.Ordinal)) &&
+                            installed != version + " " + edition) outcome = "failed";
                     }
                     detail = Tail(printed + "\n" + errors);
                     return PickCode(ran, outcome, code);
@@ -561,6 +562,10 @@ namespace CodexAutoResume
             // closes it sooner, and then the bootstrap may still be at work: said so, never as a failure with nothing
             // under it (v0.6.18 acceptance).
             if (window.Code == int.MinValue) outcome = "running";
+            // v0.6.26: handed over, as an update is (InstallUpdate) - this Dashboard closes where the setup program finished,
+            // and otherwise stays as it was, that program's window having said how it went.
+            if (outcome == "handover") { Close(); return; }
+            if (outcome == "handover-unfinished") { diagUpdate.Text = shown; RefreshAfterChange(); return; }
             // A failure always says what it can: what the bootstrap printed, else the window's log, else its ending.
             if (string.IsNullOrEmpty(detail)) detail = Tail(window.Log);
             if (string.IsNullOrEmpty(detail))
@@ -590,12 +595,13 @@ namespace CodexAutoResume
         }
 
         /// The installer window's code for a pick (InstallerWindow.Runner): 0 where it installed; the window's own codes
-        /// where the bootstrap could not be started (NotStarted) or has not finished (StillRunning); otherwise the
+        /// where the bootstrap could not be started (NotStarted), has not finished (StillRunning) or handed over (HandedOver); otherwise the
         /// bootstrap's exit code - 15 for a refusal, 12 for a list it could not read - and 1 for an exit code 0 whose
         /// answer PickLine did not take as installed, which is no success. Pure.
         internal static int PickCode(string ran, string outcome, int code)
         {
             if (outcome == "installed") return 0;
+            if (outcome == "handover" || outcome == "handover-unfinished") return InstallerFlow.HandedOver;
             if (ran == "running") return InstallerFlow.StillRunning;
             if (ran == "incomplete" || ran == "failed") return InstallerFlow.NotStarted;
             return code == 0 ? 1 : code;
@@ -793,7 +799,8 @@ namespace CodexAutoResume
         }
 
         /// The -Pick answer: "installed" (exit 0 after the `pick: offered` line, with `installed` its version and
-        /// edition), "refused" (exit 15, `reason` the word), "unavailable" (exit 12, before any offer), or "failed" -
+        /// edition), "handover" or "handover-unfinished" (exit 17, likewise; HandoverAnswer), "refused" (exit 15, `reason`
+        /// the word), "unavailable" (exit 12, before any offer), or "failed" -
         /// the installer's own failure, or anything the closed grammar does not hold. `converted` is the `pick: state
         /// converted` line's five integers whenever it was printed and read - rows, made final, conversations off,
         /// unfollowed off, and 0 or 1 for observe only paused - so a failure after the conversion still says it.
@@ -822,7 +829,7 @@ namespace CodexAutoResume
                     if (counts != null && converted == null) converted = counts;
                 }
                 else if (rest == "unavailable" || rest.StartsWith("refused ", StringComparison.Ordinal) ||
-                         rest.StartsWith("installed ", StringComparison.Ordinal))
+                         rest.StartsWith("installed ", StringComparison.Ordinal) || rest.StartsWith("handover ", StringComparison.Ordinal))
                 {
                     ends++;
                     end = rest;
@@ -830,6 +837,15 @@ namespace CodexAutoResume
                 else bad = true;
             }
             if (bad || ends != 1) return "failed";
+            // v0.6.26: handed over to the release's own setup program (exit 17), with its version, edition and exit code.
+            if (end.StartsWith("handover ", StringComparison.Ordinal))
+            {
+                string[] said = end.Substring("handover ".Length).Split(' ');
+                if (code != UpdateHandedOver || !offered || converted != null || said.Length != 3 || !VersionRule.IsMatch(said[0]) ||
+                    !IsEdition(said[1])) return "failed";
+                installed = said[0] + " " + said[1];
+                return HandoverAnswer(said[2]);
+            }
             if (end == "unavailable") return code == UpdateUnavailable && !offered && converted == null ? "unavailable" : "failed";
             if (end.StartsWith("refused ", StringComparison.Ordinal))
             {
