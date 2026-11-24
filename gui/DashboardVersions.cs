@@ -540,8 +540,10 @@ namespace CodexAutoResume
                     if (ran == "done")
                     {
                         outcome = PickLine(printed, code, out reason, out converted, out installed);
-                        if ((outcome == "installed" || outcome.StartsWith("handover", StringComparison.Ordinal)) &&
-                            installed != version + " " + edition) outcome = "failed";
+                        if (outcome == "installed" && installed != version + " " + edition) outcome = "failed";
+                        // v0.6.26: a handover names the version and edition too, and is held to the row the same way.
+                        if (outcome.StartsWith("handover", StringComparison.Ordinal) && installed != version + " " + edition)
+                            outcome = "failed";
                     }
                     detail = Tail(printed + "\n" + errors);
                     // A handover that did not finish ends the window on that program's code, with the log (HandoverCode).
