@@ -247,7 +247,7 @@ class App(WatchLoop, PlugNotices):
         main ran as its children the last time the pairing found none at the held path, each with its file's stamp;
         nothing where an engine was named (--codex-exe, the setting or the environment), which is never
         second-guessed, and nothing that is not there or cannot be read. v0.6.26 final (S5): where core's own pairing
-        looked at none - nothing waits - those the edition's own looks found (AdvancedPlug.served_elsewhere; NULL none)."""
+        looked at none - nothing waits - those the edition plug's own looks found (its `served_elsewhere`; NULL none)."""
         served = getattr(self._backend, "served_elsewhere", None)
         try:
             served = served or getattr(getattr(getattr(self, "_plug", None), "plug", None), "served_elsewhere", None)
