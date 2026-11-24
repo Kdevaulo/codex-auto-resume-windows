@@ -309,6 +309,8 @@ class UsageMeter:
             paired = backend.app_identity()
         except Exception:
             paired = None
+        # v0.6.26 final (S5): what this look found the app serving from instead, for core's next tick to decide on.
+        inuse.saw(self.paths, backend)
         if paired is None:
             self._why = SKIP_UNMATCHED if getattr(backend, "app_look", None) == "unmatched" else SKIP_CLOSED
             return False
