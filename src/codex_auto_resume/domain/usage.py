@@ -77,3 +77,17 @@ def decode(text) -> list | None:
     except ValueError:
         return None
     return windows_of({"windows": value})
+
+
+def newest(reading, added):
+    """The last reading every surface says (v0.6.26 final, from the popup's newest_reading of v0.6.16-beta.3, issue
+    #29): the watcher's own `reading` - or, where the advanced edition's usage meter read later, the meter's, which its
+    plug adds to the status under its one key (`added`, the status's domain/plug.EXTRA). The standard edition adds
+    nothing there, so this is the watcher's reading, the very object, as it always was."""
+    meter = added.get("meter") if isinstance(added, dict) else None
+    if not (isinstance(meter, dict) and isinstance(meter.get("windows"), list)
+            and type(meter.get("read_at")) in (int, float)):
+        return reading
+    if isinstance(reading, dict) and type(reading.get("read_at")) in (int, float) and reading["read_at"] >= meter["read_at"]:
+        return reading
+    return {"read_at": meter["read_at"], "windows": meter["windows"]}
